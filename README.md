@@ -2,4 +2,4 @@
 
 
 
-Following repository has the Python Scripts for Pre and Post Processing of Chesapeake Bay Forecast system.
+Following repository has the Python Scripts for Pre and Post Processing of Chesapeake Bay Real-time Forecast system.
