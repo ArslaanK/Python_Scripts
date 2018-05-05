@@ -70,11 +70,18 @@ lon  = file1.variables['x'][:]
 
 lon[lon < 180] = lon[lon < 180] + 360
 
-# traingulation and basemap 
+gridfile=url
+gridvars = netCDF4.Dataset(gridfile).variables
 
-triang = tri.Triangulation(lon, lat)
+var_element = 'element'
+
+elems = gridvars[var_element][:,:]-1  # Move to 0-indexing by subtracting 1, elements indexing starts with '1' in netcdf file
+
+
+# basemap 
+
 m = Basemap(projection='cyl',llcrnrlat=36,urcrnrlat=40,llcrnrlon=282,urcrnrlon=286,resolution='h', epsg = 4269)
-
+#US is 4269, and you can google the region you want
 
 
 for i in range(0,83):
@@ -85,15 +92,25 @@ for i in range(0,83):
     z = data.data
     file_number = '%02d'%i
     
-    levels = np.arange(-1.5, 3, 0.1)
-    
+    import matplotlib.tri as tri
+    print ('\nTriangulating ...\n')
+    triang = tri.Triangulation(lon,lat, triangles=elems)
 
-    
-    #plt.scatter(lon, lat, s=0.25, c=data,cmap='jet')   # for the scatter data visuals
+    if data.mask.any():
+      # -99999 entries in 'data' array are usually masked, mask all corresponding triangles
+      point_mask_indices = numpy.where(data.mask)
+      tri_mask = numpy.any(numpy.in1d(elems, point_mask_indices).reshape(-1, 3), axis=1)
+      triang.set_mask(tri_mask)
 
-
-    plt.tricontourf(lon,lat,z,levels=levels,alpha=0.9,vmin=-1.5, vmax=3, aspect='auto',cmap='jet')
-    #US is 4269, and you can google the region you want
+    # First create the x and y coordinates of the points.
+  
+    levels = np.arange(-1.5, 5, 0.1)
+  
+    #plt.scatter(lon, lat, s=0.0125, c=z,cmap='jet')
+        
+    print ('Making contours ...\n')
+    plt.tricontourf(triang, data, levels=levels,alpha=0.9,vmin=-1.5, vmax=5, aspect='auto',cmap='jet')
+   
     
     m.arcgisimage(service='ESRI_Imagery_World_2D', xpixels = 800, verbose= False)
     #World_Street_Map,ESRI_Imagery_World_2D,NatGeo_World_Map ,World_Imagery (type of Data to use from)  
