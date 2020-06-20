@@ -11,9 +11,6 @@ Created on Sat Jun 18 16:13:19 2020
 # Loading Libraries
 # =============================================================================
 
-import os
-#os.environ['PROJ_LIB'] = r'C:\Users\Arslaan Khalid\AppData\Local\conda\conda\pkgs\proj4-5.2.0-ha925a31_1\Library\share'
-
 import matplotlib.pyplot as plt # Import the Matplotlib package
 from mpl_toolkits.basemap import Basemap
 import scipy
@@ -29,7 +26,7 @@ import matplotlib.lines as mlines
 #  USER INPUTS
 # =============================================================================
 
-Input_dir = r'C:\Users\Arslaan Khalid\Desktop\Papers_by_Arslaan\Paper9-WW3&SWAN\Modeling\Mesh\Magothy_new_meshes\MariaNJose'#'path to files'
+Input_dir = 'path to files'
 Out_dir = Input_dir#'path to processed plots'
 plot_type= 'WaterLevels' # choose from these [Winds&Pressure,WaterLevels] [Current and Inudnation will be added later]
 
@@ -253,6 +250,6 @@ fig.suptitle(Figur_title)
 
 fig.set_size_inches(w=12,h=12)
 
-#fig.savefig(r'{}\{}.png'.format(Out_dir,plot_type),  bbox_inches = 'tight',dpi = 200, pad_inches = 0.2)
+fig.savefig(r'{}\{}.png'.format(Out_dir,plot_type),  bbox_inches = 'tight',dpi = 200, pad_inches = 0.2)
 print(f'Successfully created the Figure Type: {plot_type}')
 
