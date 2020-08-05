@@ -121,10 +121,9 @@ StreamIDs = StreamIDs.set_index(StreamIDs[0])
 StreamIDs_indx = StreamIDs[0].values.tolist()
 
 # writing the indexes to a file
-if Index_extraction_type =='Statewide' :
-    StreamIDs.to_csv(r'state_indexes.csv')
-elif Index_extraction_type =='AOI':
-    StreamIDs.to_csv(r'state_indexes_AOI.csv')
+
+StreamIDs.to_csv(r'state_indexes.csv')
+
 
 
 # concating the 3 initial dataframes again but now based on the state indexes found
