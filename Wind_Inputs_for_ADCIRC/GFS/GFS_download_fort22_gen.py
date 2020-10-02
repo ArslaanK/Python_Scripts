@@ -90,7 +90,7 @@ for i in range(0,85):
                 print(band_description)
                 print("-----------------------------")
                 v_value = i
-        if "Pressure reduced to MSL" in band_name:        
+        elif "Pressure reduced to MSL" in band_name:        
             #if "10[m]" in band_description:            
             print(i)
             print(band_name)
