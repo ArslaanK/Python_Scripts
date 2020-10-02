@@ -60,14 +60,44 @@ for i in range(0,85):
     
     #////////////////
     
-    if i == 0:
-        u_value=266
-        v_value=267
-        p_value=352
-    else:
-        u_value=288
-        v_value=289
-        p_value=415
+
+        
+
+    # Read the number of bands inside the GRIB file
+    number_of_bands = grib.RasterCount
+    print(number_of_bands)
+
+
+    # Get the band name and description
+    for i in range(1,number_of_bands):
+        #print(i)
+        band = grib.GetRasterBand(i)
+        metadata = band.GetMetadata()
+        band_name = metadata['GRIB_COMMENT']
+        band_description = band.GetDescription()
+
+        if "u-component of wind" in band_name:        
+            if "10[m]" in band_description:            
+                print(i)
+                print(band_name)
+                print(band_description)
+                print("-----------------------------")
+                u_value = i
+        elif "v-component of wind" in band_name:        
+            if "10[m]" in band_description:            
+                print(i)
+                print(band_name)
+                print(band_description)
+                print("-----------------------------")
+                v_value = i
+        if "Pressure reduced to MSL" in band_name:        
+            #if "10[m]" in band_description:            
+            print(i)
+            print(band_name)
+            print(band_description)
+            print("-----------------------------")
+            p_value = i
+
         
     #u_data of wind
     u_wind = grib.GetRasterBand(u_value)      # 288 if after 0 hour 266
