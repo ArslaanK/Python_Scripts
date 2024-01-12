@@ -51,6 +51,8 @@ gdf = gdf.dropna(subset=['Reported Time2'])
 
 gdf = gdf.sort_values(['Reported Time2'])
 
+
+gdf_global = gdf.copy()
 unique_dates = pd.to_datetime(gdf['Reported Time2']).dt.to_period('M').unique()
 
 
@@ -68,125 +70,120 @@ region_buttons = [
         color='secondary',  # You can change 'primary' to any Bootstrap color class
         style={'color': 'white'},  # Set the text color
         className='mr-1',
-    )
+    )  
     for i, region in enumerate(available_regions)
 ]
 
 
 initial_column = 'Category'
 
-
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 app.layout = dbc.Container([
     html.H1("Interactive VDOT Dashboard", className='mb-2', style={'textAlign': 'center'}),
-    
-    html.Br(),html.Br(),html.Br(),
-    
-    html.H3("Select Time Period", className='mb-2', style={'textAlign': 'center'}),
-
-    dbc.Row([
-        dbc.Col([
-            dcc.RangeSlider(
-                id='time-slider',
-                min=slider_start,
-                max=slider_end,
-                step=None,
-                marks = timewindows
-
-
-            )
-        ], width=12)
-    ]),
-
-    #------------ Define Region ---- 
-    html.H3("Select Region", className='mb-2', style={'textAlign': 'center'}),
-
-    # Add buttons to select regions
-    dbc.Row(region_buttons, className='mt-2'),
-
-    #------------ Define County ---- 
-    html.H3("Select County", className='mb-2', style={'textAlign': 'center'}),
-    html.Br(),
-    # Dropdown for counties
-    dbc.Row([
-        dbc.Col([
-            dcc.Dropdown(
-                id='county-dropdown',
-                multi=True,
-                placeholder='Showing all Counties as Default. Select one County from Dropdown if interested',
-                clearable=False,
-            )
-        ], width=12)
-    ]),
-    html.Br(),
-
-    #------------ Define Category ---- 
-    html.H4("Select Data Label", className='mb-2', style={'textAlign': 'center'}),
-
-
-    dbc.Row([
-        dbc.Col([
-            dcc.Dropdown(
-                id='category',
-                value=initial_column,
-                clearable=False,
-                options=[{'label': col, 'value': col} for col in ['County','Category','Road Type']]
-            )
-        ], width=12)
-    ]),
-
-    html.H4("Select Event Category", className='mb-2', style={'textAlign': 'center'}),
-    dbc.Row([
-        dbc.Col([
-            dcc.Dropdown(
-                id='category1',
-                multi=False,
-                placeholder='Select Event Categories',
-                clearable=False,
-            )
-        ], width=12)
-    ]),
-    html.H4("Select Event Sub-Category", className='mb-2', style={'textAlign': 'center'}),
-    dbc.Row([
-        dbc.Col([
-            dcc.Dropdown(
-                id='subcategory',
-                multi=True,
-                placeholder='Select Event Subcategories',
-                clearable=False,
-            )
-        ], width=12)
-    ]),
-    html.Br(),
-    dbc.Row([
-        dbc.Col([
-            dmc.Switch(
-                id='sync-usgs-data',
-                checked=False,  # Set the initial state of the switch
-                label='Sync USGS Data'
-            )
-        ], width=12)
-    ]),
-
-
-    # load the basemap
+    html.Br(), html.Br(), html.Br(),
 
     dbc.Row([
         dbc.Col([
             dcc.Graph(id='basemap', clickData={'points': [{'pointNumber': 0}]}),  # Initial clickData
-        ], width=14)
-    ]),
+        ], width=8),
 
+        dbc.Col([
+            html.H3("Select Time Period", className='mb-2', style={'textAlign': 'center'}),
+
+            dbc.Row([
+                dbc.Col([
+                    dcc.RangeSlider(
+                        id='time-slider',
+                        min=slider_start,
+                        max=slider_end,
+                        step=None,
+                        marks=timewindows
+                    )
+                ], width=12)
+            ]),
+
+            #------------ Define Region ---- 
+            html.H3("Select Region", className='mb-2', style={'textAlign': 'center'}),
+
+            # Add buttons to select regions
+            dbc.Row([
+                dbc.Col(button, width=2)  # Set the width to 2 for each button
+                for button in region_buttons
+            ], className='mt-2'),
+
+            #------------ Define County ---- 
+            html.H3("Select County", className='mb-2', style={'textAlign': 'center'}),
+            html.Br(),
+            # Dropdown for counties
+            dbc.Row([
+                dbc.Col([
+                    dcc.Dropdown(
+                        id='county-dropdown',
+                        multi=True,
+                        placeholder='Showing all Counties as Default. Select one County from Dropdown if interested',
+                        clearable=False,
+                    )
+                ], width=12)
+            ]),
+            html.Br(),
+
+            #------------ Define Category ---- 
+            html.H4("Select Data Label", className='mb-2', style={'textAlign': 'center'}),
+
+            dbc.Row([
+                dbc.Col([
+                    dcc.Dropdown(
+                        id='category',
+                        value=initial_column,
+                        clearable=False,
+                        options=[{'label': col, 'value': col} for col in ['County', 'Category', 'Road Type']]
+                    )
+                ], width=12)
+            ]),
+
+            html.H4("Select Event Category", className='mb-2', style={'textAlign': 'center'}),
+            dbc.Row([
+                dbc.Col([
+                    dcc.Dropdown(
+                        id='category1',
+                        multi=False,
+                        placeholder='Select Event Categories',
+                        clearable=False,
+                    )
+                ], width=12)
+            ]),
+            html.H4("Select Event Sub-Category", className='mb-2', style={'textAlign': 'center'}),
+            dbc.Row([
+                dbc.Col([
+                    dcc.Dropdown(
+                        id='subcategory',
+                        multi=True,
+                        placeholder='Select Event Subcategories',
+                        clearable=False,
+                    )
+                ], width=12)
+            ]),
+            html.Br(),
+            dbc.Row([
+                dbc.Col([
+                    dmc.Switch(
+                        id='sync-usgs-data',
+                        checked=False,  # Set the initial state of the switch
+                        label='Sync USGS Data'
+                    )
+                ], width=8)
+            ]),
+        ], width=4)
+    ]),
 
     dbc.Row([
         dbc.Col([
             dcc.Graph(id='bar-plot')
         ], width=12, md=6),
         dbc.Col([
-                    dcc.Graph(id='pie-plot')
-                ], width=12, md=6),
+            dcc.Graph(id='pie-plot')
+        ], width=12, md=6),
     ]),
-
 
     dbc.Row([
         dbc.Col([
@@ -195,26 +192,23 @@ app.layout = dbc.Container([
         dbc.Col([
             dcc.Graph(id='stage-plot')
         ], width=12, md=6),
-        
     ]),
-
 
     # add a Precip and USGS gage data
     # add weather report
 
     dbc.Row([
-
         dbc.Col([
             dag.AgGrid(
                 id='grid',
                 rowData=gdf.to_dict("records"),
-                columnDefs=[{"field": i} for i in ['FID','County','Category', 'Road Status', 'Road Type','Event Type','Reported Time']],
+                columnDefs=[{"field": i} for i in ['FID', 'County', 'Category', 'SubCategory', 'Event Type', 'Road Type', 'Reported Time']],
                 columnSize="auto",  # Adjusted column width
             )
         ], width=24, md=12),
     ], className='mt-4'),
 
-])
+], fluid=True)
 
 
 # Combine the two callback functions for 'subcategory' options into one
@@ -226,7 +220,10 @@ def update_category_options(selected_category):
     if selected_category:
         # Assuming your data has a DataFrame named 'gdf'
         if selected_category == 'Category':
+            
             category_options = [{'label': subcat, 'value': subcat} for subcat in gdf['Category'].unique()]
+            category_options.insert(0, {'label': 'All', 'value': 'All'})
+
         else:
             category_options = []  # Add handling for other categories if needed
         return category_options
@@ -241,7 +238,10 @@ def update_category_options(selected_category):
 def update_subcategory_options(selected_category2):
     #print(selected_category2)
     if selected_category2:
-        if selected_category2 == 'Incident':
+        if selected_category2 == 'All':
+            subcategory_options = [{'label': subcat, 'value': subcat} for subcat in
+                                   gdf['SubCategory'].unique()]
+        elif selected_category2 == 'Incident':
             subcategory_options = [{'label': subcat, 'value': subcat} for subcat in
                                    gdf[gdf['Category'] == 'Incident']['SubCategory'].unique()]
         elif selected_category2 == 'Weather':
@@ -250,11 +250,37 @@ def update_subcategory_options(selected_category2):
         elif selected_category2 == 'Planned Event':
             subcategory_options = [{'label': subcat, 'value': subcat} for subcat in
                                    gdf[gdf['Category'] == 'Planned Event']['SubCategory'].unique()]  # Fixed this line
+
         else:
             subcategory_options = []  # Add handling for other categories if needed
         return subcategory_options
     else:
         return []
+
+
+@app.callback(
+    Output('grid', 'rowData'),
+    Input('category1', 'value'),
+    Input('subcategory', 'value'),
+)
+
+def update_dataframe_to_filters(selected_category, selected_category2):
+    global gdf_global
+    print(selected_category,selected_category2)
+
+    if selected_category == 'All':
+        gdf = gdf_global.copy()
+        if selected_category2:
+            gdf = gdf_global[gdf_global['SubCategory'].isin(selected_category2)].copy()
+
+    elif selected_category2 is None or not selected_category2:
+        gdf = gdf_global[gdf_global['Category'] == selected_category].copy()
+    elif selected_category:
+        gdf = gdf_global[(gdf_global['Category'] == selected_category) & (gdf_global['SubCategory'].isin(selected_category2))].copy()
+    else:
+        gdf = gdf_global.copy()
+
+    return gdf.to_dict("records")      
 
 
 # Create interactivity between dropdown component, scatter plot on the basemap, and the bar plot
@@ -272,6 +298,8 @@ def update_subcategory_options(selected_category2):
     Input('basemap', 'clickData'),  # Add clickData as input
     Input('sync-usgs-data', 'checked'),  # Add checkbox state as input
     Input('county-dropdown', 'value'),
+    Input('category1', 'value'),
+    Input('subcategory', 'value'),
     *[Input({'type': 'region-button', 'index': i}, 'n_clicks_timestamp') for i in range(len(available_regions))],
     *[State({'type': 'region-button', 'index': i}, 'n_clicks') for i in range(len(available_regions))]
 )
@@ -279,10 +307,13 @@ def update_subcategory_options(selected_category2):
 
 
 
-def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,selected_counties,*region_click_timestamps_and_states):
+def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,selected_counties,selected_category, selected_category2,*region_click_timestamps_and_states):
 
     global gdf  # Declare gdf as a global variable
     # Determine which button was clicked
+
+    
+
     # Find the index of the last clicked button with a valid timestamp
     valid_timestamps = [ts for ts in region_click_timestamps_and_states[:len(available_regions)] if ts is not None]
     
@@ -300,7 +331,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
     # Filter the gdf DataFrame based on the selected region
     gdf2 = gdf[gdf['Region'] == clicked_region]
 
-
+    #print(gdf2)
     
 
     if selected_counties:
@@ -310,6 +341,49 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
     # finding the counties in the given region
     counties_in_region = gdf[(gdf['Region'] == clicked_region)]['County'].unique()
     county_options = [{'label': county, 'value': county} for county in counties_in_region]
+
+    # here we filter the dataframe
+
+    #gdf3 = gdf2.copy()
+    print(selected_category,selected_category2)
+
+    column_use =  'Category'
+
+    if selected_yaxis == 'County':
+        column_use =  'County'
+    if selected_yaxis == 'Road Type':
+        column_use =  'Road Type'
+    if selected_yaxis == 'Category':
+        column_use =  'Category'
+
+
+
+    if selected_category is None or (selected_category == 'All' and (selected_category2 is None or not selected_category2)):
+        gdf3 = gdf2.copy()
+
+
+    elif selected_category != 'All' and (selected_category2 is None or not selected_category2): 
+        gdf3 = gdf2[gdf2['Category'] == selected_category].copy()
+
+        column_use =  'SubCategory'
+
+    elif selected_category != 'All' and selected_category2 is not None: 
+        gdf3 = gdf2[(gdf2['Category'] == selected_category) & (gdf2['SubCategory'].isin(selected_category2))].copy()
+
+        column_use =  'SubCategory'
+
+    elif selected_category == 'All':
+        gdf3 = gdf2.copy()
+
+        column_use =  'Category'
+
+        if selected_category2 is not None:
+            gdf3 = gdf2[gdf2['SubCategory'].isin(selected_category2)].copy() 
+
+            column_use =  'SubCategory'
+            
+    else:
+        gdf3 = gdf2.copy()
 
 
     # Initialize discharge_plot outside the conditional block
@@ -324,14 +398,14 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
     start_date = pd.to_datetime(selected_time_range[0], unit='s')
     end_date = pd.to_datetime(selected_time_range[1], unit='s')
 
-    filtered_gdf = gdf2[
-        (gdf2['Reported Time2'] >= start_date) & (gdf2['Reported Time2'] <= end_date)
+    filtered_gdf = gdf3[
+        (gdf3['Reported Time2'] >= start_date) & (gdf3['Reported Time2'] <= end_date)
     ]
 
     # Build the Plotly scatter plot on the basemap with hover information
-    fig = px.scatter_mapbox(filtered_gdf, lat=filtered_gdf.lat, lon=filtered_gdf.lon, color=selected_yaxis,
-                            mapbox_style="carto-positron", title=f'Incidents reported during {str(start_date)[:7]} & {str(end_date)[:7]}: {selected_yaxis}',
-                            hover_name=filtered_gdf.index, hover_data={selected_yaxis: True})
+    fig = px.scatter_mapbox(filtered_gdf, lat=filtered_gdf.lat, lon=filtered_gdf.lon, color=column_use,
+                            mapbox_style="carto-positron", title=f'Incidents reported during {str(start_date)[:7]} & {str(end_date)[:7]}: {column_use}',
+                            hover_name=filtered_gdf.index, hover_data={column_use: True})
     fig.add_trace(go.Scattermapbox(
                 lat=usgs_gages.lat,
                 lon=usgs_gages.lon,
@@ -342,6 +416,8 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
                 opacity=0.3,
                 name='USGS gages', # Set the legend name
             ))
+
+    fig.update_layout(height=800)  # Adjust the height value as needed
 
     
     if click_data:
@@ -375,15 +451,15 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
    
 
     # Build the Plotly bar plot for unique entries count
-    bar_plot = px.bar(filtered_gdf[selected_yaxis].value_counts(),
-                      x=filtered_gdf[selected_yaxis].value_counts().index,
-                      y=filtered_gdf[selected_yaxis].value_counts().values,
-                      color=filtered_gdf[selected_yaxis].dropna().unique(),
-                      title=f'Unique Entries Count: {selected_yaxis}',
+    bar_plot = px.bar(filtered_gdf[column_use].value_counts(),
+                      x=filtered_gdf[column_use].value_counts().index,
+                      y=filtered_gdf[column_use].value_counts().values,
+                      color=filtered_gdf[column_use].dropna().unique(),
+                      title=f'Unique Entries Count: {column_use}',
                       labels={'y': 'Number of occurrences'})
 
 
-    pie_plot = px.pie(values=filtered_gdf[selected_yaxis].value_counts(), names=filtered_gdf[selected_yaxis].dropna().unique())
+    pie_plot = px.pie(values=filtered_gdf[column_use].value_counts(), names=filtered_gdf[column_use].dropna().unique())
 
 
 
