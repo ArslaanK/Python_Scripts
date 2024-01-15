@@ -13,6 +13,38 @@ import dash_mantine_components as dmc
 from dash import html, Output, Input, callback
 import dash
 from dash.dependencies import ALL
+import tqdm
+import numpy as np
+import shapely.geometry
+
+roads = gpd.read_file(r"C:/Users/Arslaan Khalid/Desktop/Papers_by_Arslaan/VDOT_Dashboard/Data/roads_testing_v2.shp")
+ 
+roads = roads.to_crs(4326)
+
+lats = []
+lons = []
+names = []
+# instead of this, just get this into np lists and then load them only, or dicts, so no need to redo on the fly
+for feature, name in zip(roads.geometry, roads.ST_FULL):
+    if isinstance(feature, shapely.geometry.linestring.LineString):
+        linestrings = [feature]
+    elif isinstance(feature, shapely.geometry.multilinestring.MultiLineString):
+        linestrings = feature.geoms
+    else:
+        continue
+    for linestring in linestrings:
+        x, y = linestring.xy
+        lats = np.append(lats, y)
+        lons = np.append(lons, x)
+        names = np.append(names, [name]*len(y))
+        lats = np.append(lats, None)
+        lons = np.append(lons, None)
+        names = np.append(names, None)
+
+road_lats = lats
+road_lons = lons
+road_names = names
+
 
 usgs_gages = gpd.read_file(r'C:/Users/Arslaan Khalid/Desktop/Papers_by_Arslaan/VDOT_Dashboard/Data/realstx_shp/realstx.shp')
 
@@ -21,6 +53,16 @@ usgs_gages['lat'] = usgs_gages['geometry'].y
 usgs_gages['lon'] = usgs_gages['geometry'].x
 
 usgs_gages = usgs_gages.to_crs(26918)
+
+
+met_gages = gpd.read_file(r'C:\Users\Arslaan Khalid\Desktop\Papers_by_Arslaan\VDOT_Dashboard\Data\USGS_met_gages.shp')
+
+met_gages['lat'] = met_gages['geometry'].y
+met_gages['lon'] = met_gages['geometry'].x
+
+met_gages = met_gages.to_crs(26918)
+
+
 
 # Read the shapefile
 #gdf = gpd.read_file(r"C:\Users\Arslaan Khalid\Desktop\Papers_by_Arslaan\VDOT_Dashboard\Data\sample_data.shp")
@@ -120,7 +162,7 @@ app.layout = dbc.Container([
                     dcc.Dropdown(
                         id='county-dropdown',
                         multi=True,
-                        placeholder='Showing all Counties as Default. Select one County from Dropdown if interested',
+                        placeholder='Showing all Counties as Default. Select Counties from Dropdown if interested',
                         clearable=False,
                     )
                 ], width=12)
@@ -152,13 +194,13 @@ app.layout = dbc.Container([
                     )
                 ], width=12)
             ]),
-            html.H4("Select Event Sub-Category", className='mb-2', style={'textAlign': 'center'}),
+            html.H4("Select Event Type", className='mb-2', style={'textAlign': 'center'}),
             dbc.Row([
                 dbc.Col([
                     dcc.Dropdown(
                         id='subcategory',
                         multi=True,
-                        placeholder='Select Event Subcategories',
+                        placeholder='Select Event Type',
                         clearable=False,
                     )
                 ], width=12)
@@ -175,6 +217,11 @@ app.layout = dbc.Container([
             ]),
         ], width=4)
     ]),
+    dbc.Row([
+        dbc.Col([
+        html.Button("Download Shapefile", id="shp-button", n_clicks=0),
+    ], width=4),  # Corrected indentation
+    ]),
 
     dbc.Row([
         dbc.Col([
@@ -187,11 +234,19 @@ app.layout = dbc.Container([
 
     dbc.Row([
         dbc.Col([
-            dcc.Graph(id='discharge-plot')
-        ], width=12, md=6),
+            dcc.Graph(id='discharge-plot'),
+            html.Div("Discharge Observations", style={'text-align': 'center'})  # Optional title for the plot
+        ], width=4, md=4),  # Adjust the width as needed
+
         dbc.Col([
-            dcc.Graph(id='stage-plot')
-        ], width=12, md=6),
+            dcc.Graph(id='stage-plot'),
+            html.Div("Stage Observations", style={'text-align': 'center'})  # Optional title for the plot
+        ], width=4, md=4),  # Adjust the width as needed
+
+        dbc.Col([
+            dcc.Graph(id='precip-plot'),
+            html.Div("Precipitation Observations", style={'text-align': 'center'})  # Optional title for the plot
+        ], width=4, md=4),  # Adjust the width as needed
     ]),
 
     # add a Precip and USGS gage data
@@ -199,16 +254,36 @@ app.layout = dbc.Container([
 
     dbc.Row([
         dbc.Col([
+            html.Button("Download CSV", id="csv-button", n_clicks=0),
             dag.AgGrid(
                 id='grid',
                 rowData=gdf.to_dict("records"),
-                columnDefs=[{"field": i} for i in ['FID', 'County', 'Category', 'SubCategory', 'Event Type', 'Road Type', 'Reported Time']],
+                columnDefs=[{"field": i} for i in ['FID', 'County', 'Category', 'SubCategory', 'Reason Closure','Event Type',  'Road Type', 'Reported Time','lat','lon']],
                 columnSize="auto",  # Adjusted column width
+                defaultColDef={"filter": True, "sortable": True, "floatingFilter": True},
+                suppressDragLeaveHidesColumns=True,
+                selectedRows=[],
+                csvExportParams={
+                "fileName": "filtered_data.csv",
+                },
+
+
             )
         ], width=24, md=12),
     ], className='mt-4'),
 
+
+
 ], fluid=True)
+
+@callback(
+    Output("grid", "exportDataAsCsv"),
+    Input("csv-button", "n_clicks"),
+)
+def export_data_as_csv(n_clicks):
+    if n_clicks:
+        return True
+    return False
 
 
 # Combine the two callback functions for 'subcategory' options into one
@@ -237,6 +312,7 @@ def update_category_options(selected_category):
 )
 def update_subcategory_options(selected_category2):
     #print(selected_category2)
+
     if selected_category2:
         if selected_category2 == 'All':
             subcategory_options = [{'label': subcat, 'value': subcat} for subcat in
@@ -251,36 +327,13 @@ def update_subcategory_options(selected_category2):
             subcategory_options = [{'label': subcat, 'value': subcat} for subcat in
                                    gdf[gdf['Category'] == 'Planned Event']['SubCategory'].unique()]  # Fixed this line
 
+        if len(gdf['SubCategory'].unique()) > 1:
+            return subcategory_options
         else:
-            subcategory_options = []  # Add handling for other categories if needed
-        return subcategory_options
+            return []
     else:
         return []
 
-
-@app.callback(
-    Output('grid', 'rowData'),
-    Input('category1', 'value'),
-    Input('subcategory', 'value'),
-)
-
-def update_dataframe_to_filters(selected_category, selected_category2):
-    global gdf_global
-    print(selected_category,selected_category2)
-
-    if selected_category == 'All':
-        gdf = gdf_global.copy()
-        if selected_category2:
-            gdf = gdf_global[gdf_global['SubCategory'].isin(selected_category2)].copy()
-
-    elif selected_category2 is None or not selected_category2:
-        gdf = gdf_global[gdf_global['Category'] == selected_category].copy()
-    elif selected_category:
-        gdf = gdf_global[(gdf_global['Category'] == selected_category) & (gdf_global['SubCategory'].isin(selected_category2))].copy()
-    else:
-        gdf = gdf_global.copy()
-
-    return gdf.to_dict("records")      
 
 
 # Create interactivity between dropdown component, scatter plot on the basemap, and the bar plot
@@ -289,10 +342,11 @@ def update_dataframe_to_filters(selected_category, selected_category2):
     Output('bar-plot', 'figure'),
     Output('pie-plot', 'figure'),
     Output('discharge-plot', 'figure'),   
-    Output('stage-plot', 'figure'),  
-    Output('grid', 'defaultColDef'),
+    Output('stage-plot', 'figure'),
+    Output('precip-plot', 'figure'),
     Output('county-dropdown', 'options'),
     Output('county-dropdown', 'value'),
+    Output('grid', 'rowData'),
     Input('category', 'value'),
     Input('time-slider', 'value'),
     Input('basemap', 'clickData'),  # Add clickData as input
@@ -331,16 +385,24 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
     # Filter the gdf DataFrame based on the selected region
     gdf2 = gdf[gdf['Region'] == clicked_region]
 
-    #print(gdf2)
+    # finding the counties in the given region
+    counties_in_region = gdf2[(gdf2['Region'] == clicked_region)]['County'].unique()
     
-
+    plot_pi_bar = True
     if selected_counties:
-        #print(selected_counties)
-        gdf2 = gdf[(gdf['Region'] == clicked_region) & (gdf['County'].isin(selected_counties))]
+        if selected_counties is None or not selected_counties:
+            gdf2 = gdf[gdf['Region'] == clicked_region].copy()
+        else:
+            gdf2 = gdf[(gdf['Region'] == clicked_region) & (gdf['County'].isin(selected_counties))].copy()
+            print(selected_counties)
+            if len(gdf2) < 2:
+                plot_pi_bar = False
+                gdf2 = gdf[gdf['Region'] == clicked_region].copy()
+        #print(gdf2)
 
     # finding the counties in the given region
-    counties_in_region = gdf[(gdf['Region'] == clicked_region)]['County'].unique()
-    county_options = [{'label': county, 'value': county} for county in counties_in_region]
+    #county_options = [{'label': county, 'value': county} for county in counties_in_region]
+    county_options = [county for county in counties_in_region if len(gdf[(gdf['Region'] == clicked_region) & (gdf['County'] == county)]) > 1]
 
     # here we filter the dataframe
 
@@ -367,10 +429,16 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
 
         column_use =  'SubCategory'
 
+
+
     elif selected_category != 'All' and selected_category2 is not None: 
         gdf3 = gdf2[(gdf2['Category'] == selected_category) & (gdf2['SubCategory'].isin(selected_category2))].copy()
-
-        column_use =  'SubCategory'
+        if selected_category in ['Incident','Planned Event'] :  
+            column_use =  'Event Type'
+        elif selected_category in ['Weather']:
+            column_use =  'Reason Closure'
+        else:
+            column_use =  'SubCategory'
 
     elif selected_category == 'All':
         gdf3 = gdf2.copy()
@@ -380,7 +448,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
         if selected_category2 is not None:
             gdf3 = gdf2[gdf2['SubCategory'].isin(selected_category2)].copy() 
 
-            column_use =  'SubCategory'
+            column_use =  'Reason Closure'
             
     else:
         gdf3 = gdf2.copy()
@@ -389,7 +457,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
     # Initialize discharge_plot outside the conditional block
     discharge_plot = px.line(title='Discharge Observations')
     stage_plot = px.line(title='Stage Observations')
-
+    precip_plot = px.line(title='Precipitation Observations')
 
     # Convert timestamp back to datetime
     if selected_time_range == None:
@@ -401,23 +469,96 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
     filtered_gdf = gdf3[
         (gdf3['Reported Time2'] >= start_date) & (gdf3['Reported Time2'] <= end_date)
     ]
-
+    selected_countieslabel = selected_counties
+    if selected_counties == None or len(selected_counties)==0:
+        selected_countieslabel = ''
     # Build the Plotly scatter plot on the basemap with hover information
-    fig = px.scatter_mapbox(filtered_gdf, lat=filtered_gdf.lat, lon=filtered_gdf.lon, color=column_use,
-                            mapbox_style="carto-positron", title=f'Incidents reported during {str(start_date)[:7]} & {str(end_date)[:7]}: {column_use}',
-                            hover_name=filtered_gdf.index, hover_data={column_use: True})
-    fig.add_trace(go.Scattermapbox(
-                lat=usgs_gages.lat,
-                lon=usgs_gages.lon,
-                mode='markers',
-                text=usgs_gages.STAID,
-                hoverinfo='text',
-                marker=dict(size=10, color='black'),  # Adjust the marker size and color as needed
-                opacity=0.3,
-                name='USGS gages', # Set the legend name
-            ))
+    print(filtered_gdf)
+    if len(filtered_gdf)>2: 
 
-    fig.update_layout(height=800)  # Adjust the height value as needed
+        if selected_category == 'All': 
+            # Concatenate the two Series
+            combined_series = pd.concat([gdf3['Reason Closure'].dropna(), gdf3['Event Type'].dropna()])
+
+            # Sample unique values for color to match the length of other parameters
+            sampled_color_data = combined_series.sample(n=len(filtered_gdf))
+
+            # Scatter Mapbox Plot
+            fig = px.scatter_mapbox(filtered_gdf, 
+                                    lat=filtered_gdf.lat, 
+                                    lon=filtered_gdf.lon, 
+                                    color=sampled_color_data,
+                                    mapbox_style="carto-positron", 
+                                    title=f'Incidents reported during {str(start_date)[:7]} & {str(end_date)[:7]}: {column_use} {selected_countieslabel}\n Total Incidents: {len(filtered_gdf)}',
+                                    hover_name=filtered_gdf.index, 
+                                    hover_data={column_use: True})
+        else:
+
+
+            fig = px.scatter_mapbox(filtered_gdf, lat=filtered_gdf.lat, lon=filtered_gdf.lon, color=column_use,
+                                    mapbox_style="carto-positron", title=f'Incidents reported during {str(start_date)[:7]} & {str(end_date)[:7]}: {column_use} {selected_countieslabel}\n Total Incidents: {len(filtered_gdf)}',
+                                    hover_name=filtered_gdf.index, hover_data={column_use: True})
+        fig.add_trace(go.Scattermapbox(
+                    lat=usgs_gages.lat,
+                    lon=usgs_gages.lon,
+                    mode='markers',
+                    text=usgs_gages.STAID,
+                    hoverinfo='text',
+                    marker=dict(size=10, color='black'),  # Adjust the marker size and color as needed
+                    opacity=0.3,
+                    name='USGS stream gages', # Set the legend name
+                ))
+
+        fig.add_trace(go.Scattermapbox(
+                    lat=met_gages.lat,
+                    lon=met_gages.lon,
+                    mode='markers',
+                    text=met_gages.SiteID,
+                    hoverinfo='text',
+                    marker=dict(size=10, color='blue'),  # Adjust the marker size and color as needed
+                    opacity=0.3,
+                    name='USGS met gages', # Set the legend name
+                ))
+
+        fig.add_trace(go.Scattermapbox(
+            lat=lats,
+            lon=lons,
+            mode='lines',
+            text=names,  # Road names in the 'ST_NAME' column
+            hoverinfo='text',  # Display text on hover
+            line=dict(width=1, color='black'),
+            opacity=0.2,
+            name='roads',
+            showlegend=True,
+            #visible ='legendonly',
+            below='Roads'  # Set to minimum display order
+
+        ))
+
+
+
+
+        fig.update_layout(height=800)  # Adjust the height value as needed
+    else:
+            # Create an empty scatter map with basemap and USGS gages
+        fig = px.scatter_mapbox(filtered_gdf,lat=[], lon=[], color=[], title=f'Incidents reported during {str(start_date)[:7]} & {str(end_date)[:7]}: {column_use} {selected_countieslabel}',
+                                mapbox_style="carto-positron", hover_data={column_use: True})
+
+        # Add a text annotation to indicate no data
+        fig.add_annotation(
+            go.layout.Annotation(
+                text="No data for selected filters",
+                x=0.5,
+                y=0.5,
+                xref="paper",
+                yref="paper",
+                showarrow=False,
+                font=dict(size=16),
+            )
+        )
+
+
+        fig.update_layout(height=800) 
 
     
     if click_data:
@@ -428,7 +569,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
             # Extract clicked point number
             #point_number = click_data['points'][0]['pointNumber']
             AOI = Point(click_data['points'][0]['lon'],click_data['points'][0]['lat'])
-
+            print(click_data['points'][0]['lon'],click_data['points'][0]['lat'])
 
             aoi_gdf = gpd.GeoDataFrame(geometry=[AOI])
 
@@ -445,22 +586,86 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
                 textposition='top center',
                 name='Selected Point'
             ))
+
+
+            # Identify the road or feature clicked using the geometry
+            clicked_point1 = Point(click_data['points'][0]['lon'],click_data['points'][0]['lat'])
+            clicked_point = gpd.GeoDataFrame(geometry=[clicked_point1])
+
+            clicked_point.crs = '4326'
+            selected_road = identify_selected_road(clicked_point, roads)
+
+            # Update the selected road output
+            
+
+            # get the info on the selected road
+            if len(selected_road)>0:
+                selected_road_output = f"Selected Road: {selected_road.ST_FULL.tolist()}"
+                print(selected_road_output)
+                lat1_se,lon1_se = [],[]
+
+                for index, row in selected_road.iterrows():
+                    for coords in list(row['geometry'].coords):
+                           lat1,lon1 = coords[1],coords[0]                
+                           lat1_se.append(lat1);lon1_se.append(lon1)
+                           
+                name_se=selected_road.ST_FULL.tolist()*len(lon1_se) 
+                    
+                lat1_se = np.append(lat1_se, None)
+                lon1_se = np.append(lon1_se, None)
+                name_se = np.append(name_se, None)   
+                    
+                 
+
+                fig.add_trace(go.Scattermapbox(
+                    lat=lat1_se,
+                    lon=lon1_se,
+                    mode='lines',
+                    text=name_se,  # Road names in the 'ST_NAME' column
+                    hoverinfo='text',  # Display text on hover
+                    line=dict(width=1, color='red'),
+                    opacity=0.8,
+                    name='selected road',
+                    showlegend=True,
+                    #visible ='legendonly',
+                    
+
+                ))
+
+
         # Check if points are clicked on the map
 
    
    
+    if len(filtered_gdf)>2:
+        # Build the Plotly bar plot for unique entries count
+        #print(filtered_gdf,column_use)
 
-    # Build the Plotly bar plot for unique entries count
-    bar_plot = px.bar(filtered_gdf[column_use].value_counts(),
-                      x=filtered_gdf[column_use].value_counts().index,
-                      y=filtered_gdf[column_use].value_counts().values,
-                      color=filtered_gdf[column_use].dropna().unique(),
-                      title=f'Unique Entries Count: {column_use}',
-                      labels={'y': 'Number of occurrences'})
+        if selected_category == 'All':
+            combined_series = pd.concat([filtered_gdf['Reason Closure'].dropna(), filtered_gdf['Event Type'].dropna()])
+            bar_plot = px.bar(combined_series.value_counts(),
+                              x=combined_series.value_counts().index,
+                              y=combined_series.value_counts().values,
+                              color=combined_series.dropna().unique(),
+                              title=f'Unique Entries Count: {column_use}',
+                              labels={'y': 'Number of occurrences'})
+
+            pie_plot = px.pie(values=combined_series.value_counts(), names=combined_series.dropna().unique())
+
+        else:
+            bar_plot = px.bar(filtered_gdf[column_use].value_counts(),
+                              x=filtered_gdf[column_use].value_counts().index,
+                              y=filtered_gdf[column_use].value_counts().values,
+                              color=filtered_gdf[column_use].dropna().unique(),
+                              title=f'Unique Entries Count: {column_use}',
+                              labels={'y': 'Number of occurrences'})
 
 
-    pie_plot = px.pie(values=filtered_gdf[column_use].value_counts(), names=filtered_gdf[column_use].dropna().unique())
-
+            pie_plot = px.pie(values=filtered_gdf[column_use].value_counts(), names=filtered_gdf[column_use].dropna().unique())
+    else:
+        # Initialize discharge_plot outside the conditional block
+        bar_plot = px.line(title='Bar Plot')
+        pie_plot = px.line(title='Pie Plot')
 
 
     if sync_usgs_data:
@@ -486,11 +691,16 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
                 
 
 
-                nearest_gage = gpd.sjoin_nearest(usgs_gages,aoi_gdf,max_distance=100)
+                nearest_gage = gpd.sjoin_nearest(usgs_gages,aoi_gdf,max_distance=5000)
+                print('Stream Gages')
                 print(nearest_gage)
 
+                nearest_met_gages = gpd.sjoin_nearest(met_gages,aoi_gdf,max_distance=10000)
+                print('Precipitation Gages')
+                print(nearest_met_gages)
 
                 disc_tmp = pd.DataFrame()
+
 
                 if selected_time_range == None:
                     selected_time_range = [slider_start,slider_end]
@@ -499,8 +709,8 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
                 end_date = pd.to_datetime(selected_time_range[1], unit='s')
 
 
-                for stn in nearest_gage.STAID:
-                    
+                for stn in tqdm.tqdm(nearest_gage.STAID):
+
                     #stn='01652500'
                     site = str(stn)
                     # get instantaneous values (iv), daily values (dv)
@@ -510,7 +720,11 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
                     if '00060' in df.columns: # discharge
                         disc_tmp[site]=df['00060']
 
+
+
+
                 if len(disc_tmp)>1:
+                    disc_tmp[disc_tmp < -999] = np.nan
                     discharge_plot = px.line(disc_tmp,
                                         x=disc_tmp.index,
                                         y=disc_tmp.columns,
@@ -538,7 +752,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
 
                 stage_tmp = pd.DataFrame()
                 
-                for stn in nearest_gage.STAID:
+                for stn in tqdm.tqdm(nearest_gage.STAID):
                     
                     #stn='01652500'
                     site = str(stn)
@@ -550,6 +764,8 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
                         stage_tmp[site]=df['00065']
 
                 if len(stage_tmp)>1:
+                    stage_tmp[stage_tmp > 100] = np.nan
+                    stage_tmp[stage_tmp < -99] = np.nan
                     stage_plot = px.line(stage_tmp,
                                         x=stage_tmp.index,
                                         y=stage_tmp.columns,
@@ -573,13 +789,61 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
                         ay=-40
                     )
 
+                met_tmp = pd.DataFrame()
+                
+                for stn in tqdm.tqdm(nearest_met_gages.SiteID):
+                    
+                    #stn='01652500'
+                    site = str(stn)
+                    # get instantaneous values (iv)
+                    df = nwis.get_record(sites=site, service='iv', start=f'{str(start_date)[:7]}-01', end=f'{str(end_date)[:7]}-01') # change this with slider
+
+                    
+                    if '00045' in df.columns: # discharge
+                        met_tmp[site]=df['00045']
+
+                if len(met_tmp)>1:
+                    met_tmp[met_tmp > 100] = np.nan
+                    met_tmp[met_tmp < -99] = np.nan
+
+                    precip_plot = px.line(met_tmp,
+                                        x=met_tmp.index,
+                                        y=met_tmp.columns,
+                                        title='Precipitation Observations',
+                                        labels={'y': 'inches (in)','x': 'Date Time'})
+
+                    # Update the layout of the discharge plot to add ylabel
+                    precip_plot.update_layout(
+                        yaxis_title='inches (in)'
+                    )
+                else:
+                    # If no observations, create an empty plot with a message
+                    precip_plot = go.Figure()
+                    precip_plot.add_annotation(
+                        text='No precipitation observations available for the selected gage and time range.',
+                        showarrow=False,
+                        arrowhead=1,
+                        arrowcolor='black',
+                        arrowwidth=2,
+                        ax=0,
+                        ay=-40
+                    )
+
+
+
+
+
+
+
+
+
 
 
     my_cellStyle = {
         "styleConditions": [
             {
                 "condition": f"params.colDef.field == '{selected_yaxis}'",
-                "style": {"backgroundColor": "#d3d3d3"},
+                "style": {"backgroundColor": "white"},
             },
             {
                 "condition": f"params.colDef.field != '{selected_yaxis}'",
@@ -591,7 +855,18 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
 
     
 
-    return fig, bar_plot, pie_plot, discharge_plot, stage_plot, {'cellStyle': my_cellStyle}, county_options, None
+    return fig, bar_plot, pie_plot, discharge_plot, stage_plot, precip_plot, county_options, selected_counties, filtered_gdf.to_dict("records")
+
+
+
+def identify_selected_road(clicked_point, roads_gdf):
+    selected_road = None
+
+    # Check if the clicked point intersects with any road geometry
+    
+    selected_road = gpd.sjoin_nearest(roads_gdf,clicked_point,max_distance=0.00001)
+    
+    return selected_road
 
 
 
