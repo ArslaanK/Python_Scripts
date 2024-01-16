@@ -17,34 +17,42 @@ import tqdm
 import numpy as np
 import shapely.geometry
 
-roads = gpd.read_file(r"C:/Users/Arslaan Khalid/Desktop/Papers_by_Arslaan/VDOT_Dashboard/Data/roads_testing_v2.shp")
+# roads = gpd.read_file(r"C:/Users/Arslaan Khalid/Desktop/Papers_by_Arslaan/VDOT_Dashboard/Data/roads_testing_v2.shp")
  
-roads = roads.to_crs(4326)
+# roads = roads.to_crs(4326)
 
-lats = []
-lons = []
-names = []
-# instead of this, just get this into np lists and then load them only, or dicts, so no need to redo on the fly
-for feature, name in zip(roads.geometry, roads.ST_FULL):
-    if isinstance(feature, shapely.geometry.linestring.LineString):
-        linestrings = [feature]
-    elif isinstance(feature, shapely.geometry.multilinestring.MultiLineString):
-        linestrings = feature.geoms
-    else:
-        continue
-    for linestring in linestrings:
-        x, y = linestring.xy
-        lats = np.append(lats, y)
-        lons = np.append(lons, x)
-        names = np.append(names, [name]*len(y))
-        lats = np.append(lats, None)
-        lons = np.append(lons, None)
-        names = np.append(names, None)
+# lats = []
+# lons = []
+# names = []
+# # instead of this, just get this into np lists and then load them only, or dicts, so no need to redo on the fly
+# for feature, name in zip(roads.geometry, roads.ST_FULL):
+#     if isinstance(feature, shapely.geometry.linestring.LineString):
+#         linestrings = [feature]
+#     elif isinstance(feature, shapely.geometry.multilinestring.MultiLineString):
+#         linestrings = feature.geoms
+#     else:
+#         continue
+#     for linestring in linestrings:
+#         x, y = linestring.xy
+#         lats = np.append(lats, y)
+#         lons = np.append(lons, x)
+#         names = np.append(names, [name]*len(y))
+#         lats = np.append(lats, None)
+#         lons = np.append(lons, None)
+#         names = np.append(names, None)
 
-road_lats = lats
-road_lons = lons
-road_names = names
+# road_lats = lats
+# road_lons = lons
+# road_names = names
 
+
+
+# loadin vdot regions
+
+vdot_region = gpd.read_file(r'C:/Users/Arslaan Khalid/Desktop/Papers_by_Arslaan/VDOT_Dashboard/Data/VDOT_regions.shp')
+vdot_region = vdot_region.to_crs(4326)
+
+# loading USGS Stream data
 
 usgs_gages = gpd.read_file(r'C:/Users/Arslaan Khalid/Desktop/Papers_by_Arslaan/VDOT_Dashboard/Data/realstx_shp/realstx.shp')
 
@@ -54,7 +62,7 @@ usgs_gages['lon'] = usgs_gages['geometry'].x
 
 usgs_gages = usgs_gages.to_crs(26918)
 
-
+# loading USGS Met data
 met_gages = gpd.read_file(r'C:\Users\Arslaan Khalid\Desktop\Papers_by_Arslaan\VDOT_Dashboard\Data\USGS_met_gages.shp')
 
 met_gages['lat'] = met_gages['geometry'].y
@@ -66,7 +74,34 @@ met_gages = met_gages.to_crs(26918)
 
 # Read the shapefile
 #gdf = gpd.read_file(r"C:\Users\Arslaan Khalid\Desktop\Papers_by_Arslaan\VDOT_Dashboard\Data\sample_data.shp")
-gdf = gpd.read_file(r"C:\Users\Arslaan Khalid\Desktop\Papers_by_Arslaan\VDOT_Dashboard\Data\road_closures_sample.shp")
+#gdf = gpd.read_file(r"C:\Users\Arslaan Khalid\Desktop\Papers_by_Arslaan\VDOT_Dashboard\Data\road_closures_sample.shp")
+rd_file = pd.read_csv(r"C:\Users\Arslaan Khalid\Desktop\Papers_by_Arslaan\VDOT_Dashboard\Data\road_closures.csv")
+
+# rd_file = rd_file[:1000]
+
+gdf = gpd.GeoDataFrame(rd_file, geometry=gpd.points_from_xy(rd_file['x'], rd_file['y']), crs='EPSG:4326')
+
+
+
+# loading Roads network
+
+roads_in_2 = pd.read_csv(r'C:/Users/Arslaan Khalid/Desktop/Papers_by_Arslaan/VDOT_Dashboard/Data/road_lines_undissolved.csv')
+del roads_in_2['Unnamed: 0']
+
+# roads_in_2 = roads_in_2[:1000]
+
+
+roads_in_2['geometry'] = roads_in_2['geometry'].apply(lambda x: x if pd.notnull(x) else None) 
+
+roads = gpd.GeoDataFrame(roads_in_2, geometry=gpd.GeoSeries.from_wkt(roads_in_2['geometry']), crs='EPSG:4326')
+
+roads = roads[roads.geometry.notnull()]
+
+
+roads_near_vdot = gpd.sjoin_nearest(roads, gdf,max_distance=0.0001)
+
+
+# working with the vdot incidents
 
 gdf['lat'] = gdf['geometry'].y
 gdf['lon'] = gdf['geometry'].x
@@ -98,7 +133,33 @@ gdf_global = gdf.copy()
 unique_dates = pd.to_datetime(gdf['Reported Time2']).dt.to_period('M').unique()
 
 
-timewindows = {int(date.to_timestamp().timestamp()): {'label': f'{date.month}\n{date.year}' if date.month == 1 else str(date.month)} for date in unique_dates}
+# timewindows = {int(date.to_timestamp().timestamp()): {'label': f'{date.month}\n{date.year}' if date.month == 1 else str(date.month)} for date in unique_dates}
+
+# timewindows = {
+#     int(date.to_timestamp().timestamp()): {
+#         'label': f'{date.month}\n{date.year}' if date.month in [6, 12] else ''
+#     } for date in unique_dates
+# }
+
+
+timewindows = {}
+
+for date in unique_dates:
+    timestamp = int(date.to_timestamp().timestamp())
+    
+    if date == unique_dates[0]:
+        label = f'{date.month}' 
+    elif date.month == 6:
+        label = f'{date.month}' 
+    elif date.month == 12:
+        label = f'{date.year}' 
+    else:
+        label = ''
+    
+    #label = f'{date.month}\n{date.year}' 
+    timewindows[timestamp] = {'label': label}
+
+
 
 slider_start = list(timewindows.keys())[0]
 slider_end = list(timewindows.keys())[-1]
@@ -123,6 +184,10 @@ app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 app.layout = dbc.Container([
     html.H1("Interactive VDOT Dashboard", className='mb-2', style={'textAlign': 'center'}),
     html.Br(), html.Br(), html.Br(),
+
+
+    dcc.Tabs([
+            dcc.Tab(label='Main Dashboard', children=[
 
     dbc.Row([
         dbc.Col([
@@ -214,6 +279,9 @@ app.layout = dbc.Container([
                         label='Sync USGS Data'
                     )
                 ], width=8)
+
+
+
             ]),
         ], width=4)
     ]),
@@ -226,10 +294,14 @@ app.layout = dbc.Container([
     dbc.Row([
         dbc.Col([
             dcc.Graph(id='bar-plot')
-        ], width=12, md=6),
+        ], width=12, md=4),
         dbc.Col([
             dcc.Graph(id='pie-plot')
-        ], width=12, md=6),
+        ], width=12, md=4),
+        dbc.Col([
+            dcc.Graph(id='road-plot')
+        ], width=12, md=4),
+
     ]),
 
     dbc.Row([
@@ -271,8 +343,45 @@ app.layout = dbc.Container([
             )
         ], width=24, md=12),
     ], className='mt-4'),
+    ]),
 
+        dcc.Tab(label='About', children=[
+            dbc.Row([
+                dbc.Col([
+                    html.H1("About this Dashboard", className='mb-2', style={'textAlign': 'center'}),
+                    html.P("This dashboard provides interactive visualizations for VDOT data."),
+                    # Add more information about the dashboard here...
+                ], width=8),
+            ]),
+        ]),
+        
+        dcc.Tab(label='Alerts', children=[
+            dbc.Container([  # Add this container
+                dbc.Row([
+                    dbc.Col([
+                        html.H1("Alerts Signup Page", className='mb-2', style={'textAlign': 'center'}),
+                        html.P("Here users should be able to select alerts on a given location or road."),
+                        # Add more information about the dashboard here...
+                    ], width=3),
+                ]),
+                # ... (Rest of your layout for Alerts)
+            ])
+        ]),
 
+        dcc.Tab(label='Contact Us', children=[
+            dbc.Container([  # Add this container
+                dbc.Row([
+                    dbc.Col([
+                        html.H1("Contact Us", className='mb-2', style={'textAlign': 'center'}),
+                        html.P("Contact Us"),
+                        # Add more information about the dashboard here...
+                    ], width=3),
+                ]),
+                # ... (Rest of your layout for Contact Us)
+            ])
+        ]),
+
+    ]),
 
 ], fluid=True)
 
@@ -341,6 +450,7 @@ def update_subcategory_options(selected_category2):
     Output('basemap', 'figure'),
     Output('bar-plot', 'figure'),
     Output('pie-plot', 'figure'),
+    Output('road-plot', 'figure'),
     Output('discharge-plot', 'figure'),   
     Output('stage-plot', 'figure'),
     Output('precip-plot', 'figure'),
@@ -384,6 +494,38 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
 
     # Filter the gdf DataFrame based on the selected region
     gdf2 = gdf[gdf['Region'] == clicked_region]
+
+
+    roads_near_vdot
+
+    vdot_region1 = vdot_region[vdot_region.Region == clicked_region]
+    roads_in_vdot_reg = gpd.clip(roads_near_vdot,vdot_region1)
+
+    # get values added to a dict
+    def extract_coordinates(row):
+        lats, lons, names = np.array([]), np.array([]), np.array([])
+        feature, name = row['geometry'], row['ST_FULL']
+        if isinstance(feature, (shapely.geometry.linestring.LineString, shapely.geometry.multilinestring.MultiLineString)):
+            linestrings = [feature] if isinstance(feature, shapely.geometry.linestring.LineString) else feature.geoms
+            for linestring in linestrings:
+                x, y = linestring.xy
+                lats = np.append(lats, y)
+                lons = np.append(lons, x)
+                names = np.append(names, [name] * len(y))
+                lats = np.append(lats, None)
+                lons = np.append(lons, None)
+                names = np.append(names, None)
+        return lats, lons, names
+
+    result = roads_in_vdot_reg.apply(extract_coordinates, axis=1)
+
+    lats, lons, names = np.concatenate(result.apply(lambda x: x[0]).values), np.concatenate(result.apply(lambda x: x[1]).values), np.concatenate(result.apply(lambda x: x[2]).values)
+
+    road_lats = lats
+    road_lons = lons
+    road_names = names
+
+
 
     # finding the counties in the given region
     counties_in_region = gdf2[(gdf2['Region'] == clicked_region)]['County'].unique()
@@ -507,6 +649,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
                     marker=dict(size=10, color='black'),  # Adjust the marker size and color as needed
                     opacity=0.3,
                     name='USGS stream gages', # Set the legend name
+                    visible ='legendonly'
                 ))
 
         fig.add_trace(go.Scattermapbox(
@@ -518,22 +661,24 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
                     marker=dict(size=10, color='blue'),  # Adjust the marker size and color as needed
                     opacity=0.3,
                     name='USGS met gages', # Set the legend name
+                    visible ='legendonly'
                 ))
 
         fig.add_trace(go.Scattermapbox(
-            lat=lats,
-            lon=lons,
+            lat=road_lats,
+            lon=road_lons,
             mode='lines',
-            text=names,  # Road names in the 'ST_NAME' column
+            text=road_names,  # Road names in the 'ST_NAME' column
             hoverinfo='text',  # Display text on hover
             line=dict(width=1, color='black'),
             opacity=0.2,
             name='roads',
             showlegend=True,
-            #visible ='legendonly',
+            visible ='legendonly',
             below='Roads'  # Set to minimum display order
 
         ))
+
 
 
 
@@ -560,7 +705,8 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
 
         fig.update_layout(height=800) 
 
-    
+    selected_road = []
+
     if click_data:
         #print(click_data,type(click_data))
 
@@ -632,14 +778,37 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
 
                 ))
 
+                # Update map extents
+                fig.update_layout(
+                    mapbox=dict(
+                        center=dict(lat=np.mean(lat1_se), lon=np.mean(lon1_se)),
+                        zoom=12
+                    )
+                )
+
+                roads_selected_buff = selected_road.buffer(0.0001)
+
+                filtered_gdf_cleaned = gpd.GeoDataFrame(filtered_gdf, geometry=gpd.points_from_xy(filtered_gdf.lon, filtered_gdf.lat), crs='EPSG:4326')
+                # filtered_gdf_cleaned = filtered_gdf_cleaned.crs(4326)
+                roads_incidents = gpd.clip(filtered_gdf_cleaned,roads_selected_buff)
+
+
+                roads_incidents['Reported Time2'] = pd.to_datetime(roads_incidents['Reported Time'])
+
+                roads_incidents.index = roads_incidents['Reported Time2'] 
+
+
 
         # Check if points are clicked on the map
 
    
-   
+    road_plot = px.line(title='Road Stats Over Time')
     if len(filtered_gdf)>2:
         # Build the Plotly bar plot for unique entries count
         #print(filtered_gdf,column_use)
+
+
+
 
         if selected_category == 'All':
             combined_series = pd.concat([filtered_gdf['Reason Closure'].dropna(), filtered_gdf['Event Type'].dropna()])
@@ -651,6 +820,19 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
                               labels={'y': 'Number of occurrences'})
 
             pie_plot = px.pie(values=combined_series.value_counts(), names=combined_series.dropna().unique())
+            #road_plot = px.line(title='Road Stats')
+            if len(selected_road)>0:
+                road_plot =px.scatter(
+                roads_incidents,
+                x=roads_incidents.index,
+                y='Category',
+                color='Category',  # Color by incident category
+                title="Road Stats Over Time",
+                labels={'Category': 'Event Category'}  # Custom label for y-axis
+                )
+
+
+
 
         else:
             bar_plot = px.bar(filtered_gdf[column_use].value_counts(),
@@ -662,10 +844,26 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
 
 
             pie_plot = px.pie(values=filtered_gdf[column_use].value_counts(), names=filtered_gdf[column_use].dropna().unique())
+            #road_plot = px.line(title='Road Stats')
+            #road_plot = px.line(title='Road Stats')
+
+            if len(selected_road)>0:
+                road_plot =px.scatter(
+                roads_incidents,
+                x=roads_incidents.index,
+                y='Category',
+                color='Category',  # Color by incident category
+                title="Road Stats Over Time",
+                labels={'Category': 'Event Category'}  # Custom label for y-axis
+                )
+
+
     else:
         # Initialize discharge_plot outside the conditional block
         bar_plot = px.line(title='Bar Plot')
         pie_plot = px.line(title='Pie Plot')
+        road_plot = px.line(title='Road Stats Over Time')
+
 
 
     if sync_usgs_data:
@@ -855,7 +1053,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
 
     
 
-    return fig, bar_plot, pie_plot, discharge_plot, stage_plot, precip_plot, county_options, selected_counties, filtered_gdf.to_dict("records")
+    return fig, bar_plot, pie_plot, road_plot, discharge_plot, stage_plot, precip_plot, county_options, selected_counties, filtered_gdf.to_dict("records")
 
 
 
