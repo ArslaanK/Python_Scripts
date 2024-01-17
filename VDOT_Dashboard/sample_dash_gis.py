@@ -53,7 +53,7 @@ Contact Us Page:
 
 
 
-from dash import Dash, html, dcc, Input, Output
+from dash import Dash, html, dcc, Input, Output,callback_context
 import plotly.express as px
 import dash_bootstrap_components as dbc
 import geopandas as gpd
@@ -74,8 +74,8 @@ import shapely.geometry
 import os
 import datetime
 
-# import warnings
-# warnings.filterwarnings("ignore")
+import warnings
+warnings.filterwarnings("ignore")
 
 
 current_working_directory = os.getcwd()
@@ -443,28 +443,29 @@ app.layout = dbc.Container([
 ], fluid=True)
 
 
+
+
 #------------ Function for Download csv ----
 
-@app.callback(
-    Output('csv-button', 'n_clicks'),
+@callback(
+    Output("grid", "exportDataAsCsv"),
+    Input("csv-button", "n_clicks"),
     Input('grid', 'rowData'),
-    prevent_initial_call=True
-)
+    )
 
-def download_csv(selected_rows):
-    if not selected_rows:
-        return dash.no_update
 
-    
-    selected_df = pd.DataFrame(selected_rows)
+def export_data_as_csv(n_clicks,rodata1):
+    if n_clicks:
+        # Define the file path for the CSV file
+        csv_file_path = f"{output_dir}//filtered_data.csv"
+        
+        dd = pd.DataFrame.from_records(rodata1)
+        #print(rodata1)
+        dd.to_csv(csv_file_path)
+        # Return the file path to trigger the export
+        return False
+    return False
 
-    # Save the CSV file to the specified directory
-    tmz = str(datetime.datetime.now())[:16]
-    output_csv_path = os.path.join(output_dir, f"filtered_data_{tmz}.csv")
-    selected_df.to_csv(output_csv_path, index=False)
-
-    # Increment the button click count to trigger download
-    return 1
 
 #------------ Function for defining the dropdown of categories ----
 
@@ -549,17 +550,27 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sha
 
     global gdf  # Declare gdf as a global variable
    
+    # Check if the callback is being triggered for the initial load
+    ctx = callback_context
+    #print(ctx.triggered)
+    if not ctx.triggered:
+        #print(callback_context)
+        # Set the default region to 'Northern'
+        clicked_region = 'Northern'
+
+    else:
     # Find the index of the last clicked button with a valid timestamp
-    valid_timestamps = [ts for ts in region_click_timestamps_and_states[:len(available_regions)] if ts is not None]
-    
-    # this may be causing to refresh for the county
-    if not valid_timestamps:
-        return dash.no_update
+        valid_timestamps = [ts for ts in region_click_timestamps_and_states[:len(available_regions)] if ts is not None]
+        
+        # this may be causing to refresh for the county
+        if not valid_timestamps:
 
-    last_clicked_timestamp = max(valid_timestamps)
-    clicked_button_index = region_click_timestamps_and_states.index(last_clicked_timestamp)
+            return dash.no_update
 
-    clicked_region = available_regions[clicked_button_index]
+        last_clicked_timestamp = max(valid_timestamps)
+        clicked_button_index = region_click_timestamps_and_states.index(last_clicked_timestamp)
+
+        clicked_region = available_regions[clicked_button_index]
 
     # Filter the gdf DataFrame based on the selected region
     gdf2 = gdf[gdf['Region'] == clicked_region]
@@ -604,7 +615,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sha
             gdf2 = gdf[gdf['Region'] == clicked_region].copy()
         else:
             gdf2 = gdf[(gdf['Region'] == clicked_region) & (gdf['County'].isin(selected_counties))].copy()
-            print(selected_counties)
+            #print(selected_counties)
             if len(gdf2) < 2:
                 plot_pi_bar = False
                 gdf2 = gdf[gdf['Region'] == clicked_region].copy()
@@ -617,7 +628,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sha
     # here we filter the dataframe
 
     #gdf3 = gdf2.copy()
-    print(selected_category,selected_category2)
+    #print(selected_category,selected_category2)
 
     column_use =  'Category'
 
@@ -683,7 +694,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sha
     if selected_counties == None or len(selected_counties)==0:
         selected_countieslabel = ''
     # Build the Plotly scatter plot on the basemap with hover information
-    print(filtered_gdf)
+    #print(filtered_gdf)
     if len(filtered_gdf)>2: 
 
         if selected_category == 'All': 
@@ -818,7 +829,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sha
             # get the info on the selected road
             if len(selected_road)>0:
                 selected_road_output = f"Selected Road: {selected_road.ST_FULL.tolist()}"
-                print(selected_road_output)
+                #print(selected_road_output)
                 lat1_se,lon1_se = [],[]
 
                 for index, row in selected_road.iterrows():
@@ -940,6 +951,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sha
             filtered_shp = gpd.GeoDataFrame(filtered_gdf, geometry=gpd.points_from_xy(filtered_gdf['lon'], filtered_gdf['lat']), crs='EPSG:4326')
             del filtered_shp['Reported Time2']
             tmz = str(datetime.datetime.now())[:16]
+            tmz =''
             filtered_shp.to_file(f'{output_dir}//filtered_shapefile_{tmz}.shp')
  
     if sync_usgs_data:
@@ -1151,8 +1163,40 @@ def identify_selected_road(clicked_point, roads_gdf):
     
     return selected_road
 
+#------------ Function to update button color ---
+previous_button_state = [0] * len(available_regions)
+
+# Callback to update button color
+@app.callback(
+    [Output({'type': 'region-button', 'index': i}, 'color') for i in range(len(available_regions))],
+    [Input({'type': 'region-button', 'index': i}, 'n_clicks') for i in range(len(available_regions))],
+    [State({'type': 'region-button', 'index': i}, 'id') for i in range(len(available_regions))],
+    prevent_initial_call=True,
+)
+def update_button_color(*n_clicks_values_and_ids):
+    global previous_button_state
+    
+    # Identify the clicked button index
+    clicked_button_index = None
+    for i, (n_clicks, button_id) in enumerate(zip(n_clicks_values_and_ids, range(len(available_regions)))):
+        if n_clicks and previous_button_state[i] != n_clicks:
+            clicked_button_index = i
+            previous_button_state[i] = n_clicks
+    
+    if clicked_button_index is None:
+        # No button has been clicked, set all colors to 'secondary'
+        colors = ['secondary'] * len(available_regions)
+    else:
+        # Create a list of colors for each button
+        colors = ['secondary'] * len(available_regions)
+    
+        # Set the color of the clicked button to yellow ('warning' class)
+        colors[clicked_button_index] = 'warning'
+    
+    return colors
 
 
+#========================================================================================================
 
 if __name__ == '__main__':
     app.run_server(debug=False, port=8002)
