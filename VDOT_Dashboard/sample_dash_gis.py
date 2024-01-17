@@ -228,7 +228,7 @@ app.layout = dbc.Container([
 
 
     dcc.Tabs([
-            dcc.Tab(label='Main Dashboard', children=[
+            dcc.Tab(label='Dashboard', children=[
 
     dbc.Row([
         dbc.Col([
@@ -990,7 +990,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sha
                 print('Precipitation Gages')
                 print(nearest_met_gages)
 
-                disc_tmp = pd.DataFrame()
+                
 
 
                 if selected_time_range == None:
@@ -999,7 +999,8 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sha
                 start_date = pd.to_datetime(selected_time_range[0], unit='s')
                 end_date = pd.to_datetime(selected_time_range[1], unit='s')
 
-
+                disc_tmp = pd.DataFrame()
+                stage_tmp = pd.DataFrame()
                 for stn in tqdm.tqdm(nearest_gage.STAID):
 
                     #stn='01652500'
@@ -1010,7 +1011,8 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sha
                     
                     if '00060' in df.columns: # discharge
                         disc_tmp[site]=df['00060']
-
+                    if '00065' in df.columns: # stage
+                        stage_tmp[site]=df['00065']
 
 
 
@@ -1039,20 +1041,6 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sha
                         ay=-40
                     )
 
-
-
-                stage_tmp = pd.DataFrame()
-                
-                for stn in tqdm.tqdm(nearest_gage.STAID):
-                    
-                    #stn='01652500'
-                    site = str(stn)
-                    # get instantaneous values (iv)
-                    df = nwis.get_record(sites=site, service='iv', start=f'{str(start_date)[:7]}-01', end=f'{str(end_date)[:7]}-01') # change this with slider
-
-                    
-                    if '00065' in df.columns: # discharge
-                        stage_tmp[site]=df['00065']
 
                 if len(stage_tmp)>1:
                     stage_tmp[stage_tmp > 100] = np.nan
