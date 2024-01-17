@@ -1,3 +1,58 @@
+
+Documentation = '''
+
+Map Visualization:
+    The main dashboard includes a map (using Mapbox) where incidents reported by VDOT are displayed.
+    Users can click on points on the map to get more information about the incidents.
+
+Time Filtering:
+    Users can select a specific time period using a range slider, allowing them to focus on incidents reported within a particular timeframe. 
+
+Region Selection:
+    The dashboard supports the selection of specific regions using buttons.
+    Each button represents a region, and clicking on a button filters the displayed incidents based on the chosen region.
+
+County Filtering:
+    Users can select specific counties from a dropdown menu, narrowing down the incidents displayed on the map.
+
+Data Label Selection:
+    Users can choose different data labels (e.g., 'County', 'Category', 'Road Type') to categorize and visualize incidents.
+
+Event Category and Type Filtering:
+    Users can select specific event categories and types using dropdown menus, allowing them to filter incidents based on these criteria.
+
+Road Network Visualization:
+    The code includes the visualization of the road network near the selected incidents.
+    Roads are displayed on the map, and users can click on them to get more information.
+
+Graphical Plots:
+    The dashboard includes various plots such as bar plots and pie charts displaying the distribution of incidents based on selected criteria.
+
+USGS Stream and Meteorological Data:
+    Users can synchronize USGS stream and meteorological data with the incidents on the map.
+    Clicking on the checkbox allows users to display stream gages and meteorological gages on the map.
+
+Download Data:
+    Users can download the displayed data in CSV format using a download button.
+
+Responsive Design:
+    The dashboard is designed using Dash and Bootstrap, ensuring a responsive and user-friendly layout.
+
+Tabs for Additional Information:
+    The dashboard includes tabs for 'About,' 'Alerts,' and 'Contact Us,' providing additional information and functionality.
+
+Alerts Signup Page:
+    There is a tab dedicated to an "Alerts Signup Page," allowing users to select alerts for a given location or road.
+
+Contact Us Page:
+    A "Contact Us" tab provides information for users to get in touch with the dashboard administrators.
+
+'''
+
+
+
+
+
 from dash import Dash, html, dcc, Input, Output
 import plotly.express as px
 import dash_bootstrap_components as dbc
@@ -16,132 +71,117 @@ from dash.dependencies import ALL
 import tqdm
 import numpy as np
 import shapely.geometry
+import os
+import datetime
 
-# roads = gpd.read_file(r"C:/Users/Arslaan Khalid/Desktop/Papers_by_Arslaan/VDOT_Dashboard/Data/roads_testing_v2.shp")
- 
-# roads = roads.to_crs(4326)
-
-# lats = []
-# lons = []
-# names = []
-# # instead of this, just get this into np lists and then load them only, or dicts, so no need to redo on the fly
-# for feature, name in zip(roads.geometry, roads.ST_FULL):
-#     if isinstance(feature, shapely.geometry.linestring.LineString):
-#         linestrings = [feature]
-#     elif isinstance(feature, shapely.geometry.multilinestring.MultiLineString):
-#         linestrings = feature.geoms
-#     else:
-#         continue
-#     for linestring in linestrings:
-#         x, y = linestring.xy
-#         lats = np.append(lats, y)
-#         lons = np.append(lons, x)
-#         names = np.append(names, [name]*len(y))
-#         lats = np.append(lats, None)
-#         lons = np.append(lons, None)
-#         names = np.append(names, None)
-
-# road_lats = lats
-# road_lons = lons
-# road_names = names
+# import warnings
+# warnings.filterwarnings("ignore")
 
 
+current_working_directory = os.getcwd()
 
-# loadin vdot regions
+data_root = f'{current_working_directory}//Data_Clean'
+output_dir = f'{current_working_directory}//Outputs'
 
-vdot_region = gpd.read_file(r'C:/Users/Arslaan Khalid/Desktop/Papers_by_Arslaan/VDOT_Dashboard/Data/VDOT_regions.shp')
-vdot_region = vdot_region.to_crs(4326)
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+# loading vdot regions
+# data_root = r'C:/Users/Arslaan Khalid/Desktop/Papers_by_Arslaan/VDOT_Dashboard/Data'
+# data_root = current_working_directory
+
+
+file_names = { 'VDOT closures': 'road_closures.csv',
+               'VDOT Region': 'VDOT_regions.csv',
+               'Gages': 'USGS_gagesVA.csv',
+               'Roads': 'road_lines_simplified.csv',   
+    }
+
+
+vdot_region1 = pd.read_csv(f"{data_root}//{file_names['VDOT Region']}")
+del vdot_region1['Unnamed: 0']
+
+vdot_region1 = gpd.GeoDataFrame(vdot_region1, geometry=gpd.GeoSeries.from_wkt(vdot_region1['geometry']), crs='EPSG:26918')
+vdot_region = vdot_region1.to_crs(4326)
+
+
 
 # loading USGS Stream data
+VA = pd.read_csv(f"{data_root}//{file_names['Gages']}", dtype ='str')
+usgs_gages_all = gpd.GeoDataFrame(VA, geometry=gpd.points_from_xy(VA['dec_long_va'], VA['dec_lat_va']), crs='EPSG:4326')
 
-usgs_gages = gpd.read_file(r'C:/Users/Arslaan Khalid/Desktop/Papers_by_Arslaan/VDOT_Dashboard/Data/realstx_shp/realstx.shp')
+usgs_gages_all['lat'] = usgs_gages_all['geometry'].y
+usgs_gages_all['lon'] = usgs_gages_all['geometry'].x
 
+usgs_gages_all['STAID'] = usgs_gages_all.site_no 
 
-usgs_gages['lat'] = usgs_gages['geometry'].y
-usgs_gages['lon'] = usgs_gages['geometry'].x
+usgs_gages_all = usgs_gages_all.to_crs(26918)
 
-usgs_gages = usgs_gages.to_crs(26918)
-
-# loading USGS Met data
-met_gages = gpd.read_file(r'C:\Users\Arslaan Khalid\Desktop\Papers_by_Arslaan\VDOT_Dashboard\Data\USGS_met_gages.shp')
-
-met_gages['lat'] = met_gages['geometry'].y
-met_gages['lon'] = met_gages['geometry'].x
-
-met_gages = met_gages.to_crs(26918)
+usgs_gages = usgs_gages_all[usgs_gages_all['parm_cd'].isin(['00060', '00065'])]
+usgs_gages.drop_duplicates(subset='STAID', keep='first', inplace=True)
 
 
 
-# Read the shapefile
-#gdf = gpd.read_file(r"C:\Users\Arslaan Khalid\Desktop\Papers_by_Arslaan\VDOT_Dashboard\Data\sample_data.shp")
-#gdf = gpd.read_file(r"C:\Users\Arslaan Khalid\Desktop\Papers_by_Arslaan\VDOT_Dashboard\Data\road_closures_sample.shp")
-rd_file = pd.read_csv(r"C:\Users\Arslaan Khalid\Desktop\Papers_by_Arslaan\VDOT_Dashboard\Data\road_closures.csv")
+# loading USGS Met 
+usgs_gages_wind = usgs_gages_all[usgs_gages_all.parm_cd=='00035']
+
+met_gages = usgs_gages_all[usgs_gages_all.parm_cd=='00400']
+
+# Read the VDOT data
+rd_file = pd.read_csv(f"{data_root}//{file_names['VDOT closures']}")
 
 # rd_file = rd_file[:1000]
-
+# convert to dataframe
 gdf = gpd.GeoDataFrame(rd_file, geometry=gpd.points_from_xy(rd_file['x'], rd_file['y']), crs='EPSG:4326')
 
 
-
 # loading Roads network
-
-roads_in_2 = pd.read_csv(r'C:/Users/Arslaan Khalid/Desktop/Papers_by_Arslaan/VDOT_Dashboard/Data/road_lines_undissolved.csv')
+roads_in_2 = pd.read_csv(f"{data_root}//{file_names['Roads']}")
 del roads_in_2['Unnamed: 0']
-
 # roads_in_2 = roads_in_2[:1000]
 
-
+# convert to dataframe
 roads_in_2['geometry'] = roads_in_2['geometry'].apply(lambda x: x if pd.notnull(x) else None) 
-
 roads = gpd.GeoDataFrame(roads_in_2, geometry=gpd.GeoSeries.from_wkt(roads_in_2['geometry']), crs='EPSG:4326')
-
+# remove null geometry, if any
 roads = roads[roads.geometry.notnull()]
 
-
+# join all roads with the vdot data, to clean some road loading
 roads_near_vdot = gpd.sjoin_nearest(roads, gdf,max_distance=0.0001)
 
 
-# working with the vdot incidents
-
+# keep, lat lon columns
 gdf['lat'] = gdf['geometry'].y
 gdf['lon'] = gdf['geometry'].x
 
 # Convert the geometry column to GeoJSON
 gdf['geometry'] = gdf['geometry'].apply(lambda geom: geom.__geo_interface__)
 
+# keeping interested columns
 intersted_columns = ['fid', 'containing','containi_1', 'event_cate', 'event_subc','reason_for',  'road_syste',
        'route_name', 'type_event', 'update_tim', 'geometry',
        'lat', 'lon']
-
 gdf = gdf[intersted_columns]
 
 gdf.columns = ['FID', 'County', 'Region','Category','SubCategory', 'Reason Closure', 'Road Type',
        'Route Name', 'Event Type', 'Reported Time', 'geometry',
        'lat', 'lon']
 
+# get all unique regions
 available_regions = gdf['Region'].unique()
 
-
+# convert to datetime
 gdf['Reported Time2'] = pd.to_datetime(gdf['Reported Time'], errors='coerce')
-
 gdf = gdf.dropna(subset=['Reported Time2'])
-
 gdf = gdf.sort_values(['Reported Time2'])
 
-
+# define a global variable for usage later
 gdf_global = gdf.copy()
+
+# get unique month and years
 unique_dates = pd.to_datetime(gdf['Reported Time2']).dt.to_period('M').unique()
 
-
-# timewindows = {int(date.to_timestamp().timestamp()): {'label': f'{date.month}\n{date.year}' if date.month == 1 else str(date.month)} for date in unique_dates}
-
-# timewindows = {
-#     int(date.to_timestamp().timestamp()): {
-#         'label': f'{date.month}\n{date.year}' if date.month in [6, 12] else ''
-#     } for date in unique_dates
-# }
-
-
+# create the labels for the slider
 timewindows = {}
 
 for date in unique_dates:
@@ -155,16 +195,15 @@ for date in unique_dates:
         label = f'{date.year}' 
     else:
         label = ''
-    
-    #label = f'{date.month}\n{date.year}' 
     timewindows[timestamp] = {'label': label}
 
 
-
+# slider 1st and last
 slider_start = list(timewindows.keys())[0]
 slider_end = list(timewindows.keys())[-1]
 
 
+# create region buttons
 
 region_buttons = [
     dbc.Button(
@@ -177,10 +216,12 @@ region_buttons = [
     for i, region in enumerate(available_regions)
 ]
 
-
+# initialize a column
 initial_column = 'Category'
-
+initial_region = 'Northern'
+# create DASH app
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+
 app.layout = dbc.Container([
     html.H1("Interactive VDOT Dashboard", className='mb-2', style={'textAlign': 'center'}),
     html.Br(), html.Br(), html.Br(),
@@ -195,6 +236,17 @@ app.layout = dbc.Container([
         ], width=8),
 
         dbc.Col([
+
+            #------------ Define Region ---- 
+            html.H3("Select Region", className='mb-2', style={'textAlign': 'center'}),
+
+            # Add buttons to select regions
+            dbc.Row([
+                dbc.Col(button, width=2)  # Set the width to 2 for each button
+                for button in region_buttons
+            ], className='mt-2'),
+
+            # ------------ time slider
             html.H3("Select Time Period", className='mb-2', style={'textAlign': 'center'}),
 
             dbc.Row([
@@ -208,16 +260,6 @@ app.layout = dbc.Container([
                     )
                 ], width=12)
             ]),
-
-            #------------ Define Region ---- 
-            html.H3("Select Region", className='mb-2', style={'textAlign': 'center'}),
-
-            # Add buttons to select regions
-            dbc.Row([
-                dbc.Col(button, width=2)  # Set the width to 2 for each button
-                for button in region_buttons
-            ], className='mt-2'),
-
             #------------ Define County ---- 
             html.H3("Select County", className='mb-2', style={'textAlign': 'center'}),
             html.Br(),
@@ -247,7 +289,7 @@ app.layout = dbc.Container([
                     )
                 ], width=12)
             ]),
-
+            #------------ Define Event Category ---- 
             html.H4("Select Event Category", className='mb-2', style={'textAlign': 'center'}),
             dbc.Row([
                 dbc.Col([
@@ -259,6 +301,8 @@ app.layout = dbc.Container([
                     )
                 ], width=12)
             ]),
+
+            #------------ Define Event Category ----
             html.H4("Select Event Type", className='mb-2', style={'textAlign': 'center'}),
             dbc.Row([
                 dbc.Col([
@@ -270,6 +314,8 @@ app.layout = dbc.Container([
                     )
                 ], width=12)
             ]),
+
+            #------------ Define USGS Sync Button ----
             html.Br(),
             dbc.Row([
                 dbc.Col([
@@ -285,11 +331,15 @@ app.layout = dbc.Container([
             ]),
         ], width=4)
     ]),
+
+    #------------ Define Download Shapefile ----
     dbc.Row([
         dbc.Col([
         html.Button("Download Shapefile", id="shp-button", n_clicks=0),
     ], width=4),  # Corrected indentation
     ]),
+
+    #------------ Define Stats Plots ----
 
     dbc.Row([
         dbc.Col([
@@ -303,6 +353,8 @@ app.layout = dbc.Container([
         ], width=12, md=4),
 
     ]),
+
+    #------------ Define Timeseries Plots ----
 
     dbc.Row([
         dbc.Col([
@@ -321,8 +373,9 @@ app.layout = dbc.Container([
         ], width=4, md=4),  # Adjust the width as needed
     ]),
 
-    # add a Precip and USGS gage data
-    # add weather report
+    # add weather report 
+
+    #------------ Download CSV ----
 
     dbc.Row([
         dbc.Col([
@@ -345,11 +398,13 @@ app.layout = dbc.Container([
     ], className='mt-4'),
     ]),
 
+    #------------ Here we define tabs for further info ----
+
         dcc.Tab(label='About', children=[
             dbc.Row([
                 dbc.Col([
                     html.H1("About this Dashboard", className='mb-2', style={'textAlign': 'center'}),
-                    html.P("This dashboard provides interactive visualizations for VDOT data."),
+                    html.P(Documentation),
                     # Add more information about the dashboard here...
                 ], width=8),
             ]),
@@ -383,19 +438,36 @@ app.layout = dbc.Container([
 
     ]),
 
+    #------------ Here tabs end ----
+
 ], fluid=True)
 
-@callback(
-    Output("grid", "exportDataAsCsv"),
-    Input("csv-button", "n_clicks"),
+
+#------------ Function for Download csv ----
+
+@app.callback(
+    Output('csv-button', 'n_clicks'),
+    Input('grid', 'rowData'),
+    prevent_initial_call=True
 )
-def export_data_as_csv(n_clicks):
-    if n_clicks:
-        return True
-    return False
 
+def download_csv(selected_rows):
+    if not selected_rows:
+        return dash.no_update
 
-# Combine the two callback functions for 'subcategory' options into one
+    
+    selected_df = pd.DataFrame(selected_rows)
+
+    # Save the CSV file to the specified directory
+    tmz = str(datetime.datetime.now())[:16]
+    output_csv_path = os.path.join(output_dir, f"filtered_data_{tmz}.csv")
+    selected_df.to_csv(output_csv_path, index=False)
+
+    # Increment the button click count to trigger download
+    return 1
+
+#------------ Function for defining the dropdown of categories ----
+
 @app.callback(
     Output('category1', 'options'),
     Input('category', 'value'),
@@ -414,6 +486,8 @@ def update_category_options(selected_category):
     else:
         return []
 
+
+#------------ Function for defining the dropdown of sub-categories ----
 
 @app.callback(
     Output('subcategory', 'options'),
@@ -444,8 +518,8 @@ def update_subcategory_options(selected_category2):
         return []
 
 
+#------------ Function interactivity between dropdown component, scatter plot on the basemap, and the bar plot ----
 
-# Create interactivity between dropdown component, scatter plot on the basemap, and the bar plot
 @app.callback(
     Output('basemap', 'figure'),
     Output('bar-plot', 'figure'),
@@ -461,6 +535,7 @@ def update_subcategory_options(selected_category2):
     Input('time-slider', 'value'),
     Input('basemap', 'clickData'),  # Add clickData as input
     Input('sync-usgs-data', 'checked'),  # Add checkbox state as input
+    Input('shp-button', 'n_clicks'),  # Add shp checkbox state as input
     Input('county-dropdown', 'value'),
     Input('category1', 'value'),
     Input('subcategory', 'value'),
@@ -470,14 +545,10 @@ def update_subcategory_options(selected_category2):
 
 
 
-
-def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,selected_counties,selected_category, selected_category2,*region_click_timestamps_and_states):
+def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,shape_checked,selected_counties,selected_category, selected_category2,*region_click_timestamps_and_states):
 
     global gdf  # Declare gdf as a global variable
-    # Determine which button was clicked
-
-    
-
+   
     # Find the index of the last clicked button with a valid timestamp
     valid_timestamps = [ts for ts in region_click_timestamps_and_states[:len(available_regions)] if ts is not None]
     
@@ -489,15 +560,11 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
     clicked_button_index = region_click_timestamps_and_states.index(last_clicked_timestamp)
 
     clicked_region = available_regions[clicked_button_index]
-    #print(clicked_button_index,clicked_region)
-
 
     # Filter the gdf DataFrame based on the selected region
     gdf2 = gdf[gdf['Region'] == clicked_region]
 
-
-    roads_near_vdot
-
+    # get vdot selected region
     vdot_region1 = vdot_region[vdot_region.Region == clicked_region]
     roads_in_vdot_reg = gpd.clip(roads_near_vdot,vdot_region1)
 
@@ -517,6 +584,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
                 names = np.append(names, None)
         return lats, lons, names
 
+    # 
     result = roads_in_vdot_reg.apply(extract_coordinates, axis=1)
 
     lats, lons, names = np.concatenate(result.apply(lambda x: x[0]).values), np.concatenate(result.apply(lambda x: x[1]).values), np.concatenate(result.apply(lambda x: x[2]).values)
@@ -656,7 +724,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
                     lat=met_gages.lat,
                     lon=met_gages.lon,
                     mode='markers',
-                    text=met_gages.SiteID,
+                    text=met_gages.STAID,
                     hoverinfo='text',
                     marker=dict(size=10, color='blue'),  # Adjust the marker size and color as needed
                     opacity=0.3,
@@ -741,6 +809,9 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
             clicked_point.crs = '4326'
             selected_road = identify_selected_road(clicked_point, roads)
 
+            selected_road = selected_road[0:1] # always select the first road
+
+
             # Update the selected road output
             
 
@@ -781,7 +852,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
                 # Update map extents
                 fig.update_layout(
                     mapbox=dict(
-                        center=dict(lat=np.mean(lat1_se), lon=np.mean(lon1_se)),
+                        center=dict(lat=np.mean(lat1_se[:-1]), lon=np.mean(lon1_se[:-1])),
                         zoom=12
                     )
                 )
@@ -865,8 +936,14 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
         road_plot = px.line(title='Road Stats Over Time')
 
 
-
+    if shape_checked:
+            filtered_shp = gpd.GeoDataFrame(filtered_gdf, geometry=gpd.points_from_xy(filtered_gdf['lon'], filtered_gdf['lat']), crs='EPSG:4326')
+            del filtered_shp['Reported Time2']
+            tmz = str(datetime.datetime.now())[:16]
+            filtered_shp.to_file(f'{output_dir}//filtered_shapefile_{tmz}.shp')
+ 
     if sync_usgs_data:
+
         if click_data:
             #print(click_data,type(click_data))
 
@@ -889,11 +966,15 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
                 
 
 
-                nearest_gage = gpd.sjoin_nearest(usgs_gages,aoi_gdf,max_distance=5000)
+                nearest_gage = gpd.sjoin_nearest(usgs_gages,aoi_gdf,max_distance=5000) #
+                if len(nearest_gage)==0:
+                    nearest_gage = gpd.sjoin_nearest(usgs_gages,aoi_gdf,max_distance=20000) #
                 print('Stream Gages')
                 print(nearest_gage)
 
-                nearest_met_gages = gpd.sjoin_nearest(met_gages,aoi_gdf,max_distance=10000)
+                nearest_met_gages = gpd.sjoin_nearest(met_gages,aoi_gdf,max_distance=5000)
+                if len(nearest_met_gages)==0:
+                    nearest_met_gages = gpd.sjoin_nearest(met_gages,aoi_gdf,max_distance=20000) #
                 print('Precipitation Gages')
                 print(nearest_met_gages)
 
@@ -989,7 +1070,7 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
 
                 met_tmp = pd.DataFrame()
                 
-                for stn in tqdm.tqdm(nearest_met_gages.SiteID):
+                for stn in tqdm.tqdm(nearest_met_gages.STAID):
                     
                     #stn='01652500'
                     site = str(stn)
@@ -1026,6 +1107,10 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sel
                         ax=0,
                         ay=-40
                     )
+
+
+
+
 
 
 
