@@ -95,7 +95,7 @@ google-crc32c==0.1.0
 google-resumable-media==0.7.0
 googleapis-common-protos==1.52.0
 graphviz==0.20.1
-grpcio==1.30.0
+grpcio==1.53.0
 gunicorn==21.2.0
 h5py @ file:///D:/bld/h5py_1674499069044/work
 HeapDict==1.0.1
