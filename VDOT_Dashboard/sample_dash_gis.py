@@ -86,7 +86,7 @@ output_dir = f'{current_working_directory}//Outputs'
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
-# loading vdot regions
+
 # data_root = r'C:/Users/Arslaan Khalid/Desktop/Papers_by_Arslaan/VDOT_Dashboard/Data'
 # data_root = current_working_directory
 
@@ -94,8 +94,25 @@ if not os.path.exists(output_dir):
 file_names = { 'VDOT closures': 'road_closures.csv',
                'VDOT Region': 'VDOT_regions.csv',
                'Gages': 'USGS_gagesVA.csv',
-               'Roads': 'road_lines_simplified.csv',   
+               'Roads': 'road_lines_simplified.csv', 
+               'Obs Stage': 'usgs_discharges_2019_2024.csv',
+               'Obs Discharge': 'usgs_discharges_2019_2024.csv' ,
+               'Obs Precipitation': 'usgs_precip_2019_2024.csv'  
     }
+
+# loading observations
+
+disc_df = pd.read_csv(r'C:\Users\Arslaan Khalid\Desktop\Papers_by_Arslaan\VDOT_Dashboard\Data_Clean\usgs_discharges_2019_2024.csv')       
+stage_df = pd.read_csv(r'C:\Users\Arslaan Khalid\Desktop\Papers_by_Arslaan\VDOT_Dashboard\Data_Clean\usgs_stage_2019_2024.csv')          
+met_df = pd.read_csv(r'C:\Users\Arslaan Khalid\Desktop\Papers_by_Arslaan\VDOT_Dashboard\Data_Clean\usgs_precip_2019_2024.csv') 
+
+# converting to datetime index
+disc_df.index = pd.to_datetime(disc_df['datetime']);del disc_df['datetime']
+stage_df.index = pd.to_datetime(stage_df['datetime']);del stage_df['datetime']
+met_df.index = pd.to_datetime(met_df['datetime']);del met_df['datetime']
+
+
+# loading vdot regions
 
 
 vdot_region1 = pd.read_csv(f"{data_root}//{file_names['VDOT Region']}")
@@ -125,7 +142,7 @@ usgs_gages.drop_duplicates(subset='STAID', keep='first', inplace=True)
 # loading USGS Met 
 usgs_gages_wind = usgs_gages_all[usgs_gages_all.parm_cd=='00035']
 
-met_gages = usgs_gages_all[usgs_gages_all.parm_cd=='00400']
+met_gages = usgs_gages_all[usgs_gages_all.parm_cd=='00045']
 
 # Read the VDOT data
 rd_file = pd.read_csv(f"{data_root}//{file_names['VDOT closures']}")
@@ -224,8 +241,7 @@ app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 app.layout = dbc.Container([
     html.H1("Interactive VDOT Dashboard", className='mb-2', style={'textAlign': 'center'}),
-    html.Br(), html.Br(), html.Br(),
-
+    html.Br(),
 
     dcc.Tabs([
             dcc.Tab(label='Dashboard', children=[
@@ -316,19 +332,21 @@ app.layout = dbc.Container([
             ]),
 
             #------------ Define USGS Sync Button ----
-            html.Br(),
-            dbc.Row([
-                dbc.Col([
-                    dmc.Switch(
-                        id='sync-usgs-data',
-                        checked=False,  # Set the initial state of the switch
-                        label='Sync USGS Data'
-                    )
-                ], width=8)
+            # html.Br(),
+            # dbc.Row([
+            #     dbc.Col([
+            #         dmc.Switch(
+            #             id='sync-usgs-data',
+            #             checked=False,  # Set the initial state of the switch
+            #             label='Sync USGS Data'
+            #         )
+            #     ], width=8)
 
 
 
-            ]),
+            # ]),
+
+
         ], width=4)
     ]),
 
@@ -359,17 +377,17 @@ app.layout = dbc.Container([
     dbc.Row([
         dbc.Col([
             dcc.Graph(id='discharge-plot'),
-            html.Div("Discharge Observations", style={'text-align': 'center'})  # Optional title for the plot
+            html.Div(style={'text-align': 'center'})  # Optional title for the plot
         ], width=4, md=4),  # Adjust the width as needed
 
         dbc.Col([
             dcc.Graph(id='stage-plot'),
-            html.Div("Stage Observations", style={'text-align': 'center'})  # Optional title for the plot
+            html.Div(style={'text-align': 'center'})  # Optional title for the plot
         ], width=4, md=4),  # Adjust the width as needed
 
         dbc.Col([
             dcc.Graph(id='precip-plot'),
-            html.Div("Precipitation Observations", style={'text-align': 'center'})  # Optional title for the plot
+            html.Div(style={'text-align': 'center'})  # Optional title for the plot
         ], width=4, md=4),  # Adjust the width as needed
     ]),
 
@@ -535,7 +553,7 @@ def update_subcategory_options(selected_category2):
     Input('category', 'value'),
     Input('time-slider', 'value'),
     Input('basemap', 'clickData'),  # Add clickData as input
-    Input('sync-usgs-data', 'checked'),  # Add checkbox state as input
+    # Input('sync-usgs-data', 'checked'),  # Add checkbox state as input
     Input('shp-button', 'n_clicks'),  # Add shp checkbox state as input
     Input('county-dropdown', 'value'),
     Input('category1', 'value'),
@@ -546,7 +564,7 @@ def update_subcategory_options(selected_category2):
 
 
 
-def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,shape_checked,selected_counties,selected_category, selected_category2,*region_click_timestamps_and_states):
+def update_map(selected_yaxis, selected_time_range,click_data,shape_checked,selected_counties,selected_category, selected_category2,*region_click_timestamps_and_states): #sync_usgs_data
 
     global gdf  # Declare gdf as a global variable
    
@@ -954,159 +972,193 @@ def update_map(selected_yaxis, selected_time_range,click_data,sync_usgs_data,sha
             tmz =''
             filtered_shp.to_file(f'{output_dir}//filtered_shapefile_{tmz}.shp')
  
-    if sync_usgs_data:
+    # if sync_usgs_data:
 
-        if click_data:
-            #print(click_data,type(click_data))
+    if click_data:
+        #print(click_data,type(click_data))
 
-            if 'lon' in click_data['points'][0]:
-             
-                # Extract clicked point number
-                #point_number = click_data['points'][0]['pointNumber']
-                AOI = Point(click_data['points'][0]['lon'],click_data['points'][0]['lat'])
+        if 'lon' in click_data['points'][0]:
+         
+            # Extract clicked point number
+            #point_number = click_data['points'][0]['pointNumber']
+            AOI = Point(click_data['points'][0]['lon'],click_data['points'][0]['lat'])
 
 
-                aoi_gdf = gpd.GeoDataFrame(geometry=[AOI])
+            aoi_gdf = gpd.GeoDataFrame(geometry=[AOI])
 
-                aoi_gdf.crs = '4326'
-                aoi_gdf = aoi_gdf.to_crs(26918)
+            aoi_gdf.crs = '4326'
+            aoi_gdf = aoi_gdf.to_crs(26918)
 
-                # Add a circle around the clicked point
-                circle_radius = 100  # Adjust the radius as needed
-                circle = aoi_gdf.buffer(circle_radius)
+            # Add a circle around the clicked point
+            circle_radius = 100  # Adjust the radius as needed
+            circle = aoi_gdf.buffer(circle_radius)
+
+            
+
+
+            nearest_gage = gpd.sjoin_nearest(usgs_gages,aoi_gdf,max_distance=5000) #
+            if len(nearest_gage)==0:
+                nearest_gage = gpd.sjoin_nearest(usgs_gages,aoi_gdf,max_distance=20000) #
+            print('Stream Gages')
+            print(nearest_gage)
+
+            nearest_met_gages = gpd.sjoin_nearest(met_gages,aoi_gdf,max_distance=5000)
+            if len(nearest_met_gages)==0:
+                nearest_met_gages = gpd.sjoin_nearest(met_gages,aoi_gdf,max_distance=20000) #
+            print('Precipitation Gages')
+            print(nearest_met_gages)
+
+            
+
+
+            if selected_time_range == None:
+                selected_time_range = [slider_start,slider_end]
+
+            start_date = pd.to_datetime(selected_time_range[0], unit='s')
+            end_date = pd.to_datetime(selected_time_range[1], unit='s')
+
+            disc_tmp = pd.DataFrame()
+            stage_tmp = pd.DataFrame()
+            print(start_date,end_date)
+            
+            # selecting preloaded data for nearest gages
+            usgs_ = nearest_gage.STAID.tolist()
+            usgs_disc,usgs_stg = [],[]
+
+            for ii in usgs_:
+                if ii in disc_df.columns:
+                    usgs_disc.append(ii)
+                if ii in disc_df.columns:
+                    usgs_stg.append(ii)
+
+            disc_tmp = disc_df[usgs_disc]
+            stage_tmp = stage_df[usgs_stg]
+            # applying time indexing
+            disc_tmp = disc_tmp[str(start_date):str(end_date)]
+            stage_tmp = stage_tmp[str(start_date):str(end_date)]
+
+            # for stn in tqdm.tqdm(nearest_gage.STAID):
+
+            #     #stn='01652500'
+            #     site = str(stn)
+            #     # get instantaneous values (iv), daily values (dv)
+            #     df = nwis.get_record(sites=site, service='iv', start=f'{str(start_date)[:7]}-01', end=f'{str(end_date)[:7]}-01') # change this with slider
 
                 
-
-
-                nearest_gage = gpd.sjoin_nearest(usgs_gages,aoi_gdf,max_distance=5000) #
-                if len(nearest_gage)==0:
-                    nearest_gage = gpd.sjoin_nearest(usgs_gages,aoi_gdf,max_distance=20000) #
-                print('Stream Gages')
-                print(nearest_gage)
-
-                nearest_met_gages = gpd.sjoin_nearest(met_gages,aoi_gdf,max_distance=5000)
-                if len(nearest_met_gages)==0:
-                    nearest_met_gages = gpd.sjoin_nearest(met_gages,aoi_gdf,max_distance=20000) #
-                print('Precipitation Gages')
-                print(nearest_met_gages)
-
-                
-
-
-                if selected_time_range == None:
-                    selected_time_range = [slider_start,slider_end]
-
-                start_date = pd.to_datetime(selected_time_range[0], unit='s')
-                end_date = pd.to_datetime(selected_time_range[1], unit='s')
-
-                disc_tmp = pd.DataFrame()
-                stage_tmp = pd.DataFrame()
-                for stn in tqdm.tqdm(nearest_gage.STAID):
-
-                    #stn='01652500'
-                    site = str(stn)
-                    # get instantaneous values (iv), daily values (dv)
-                    df = nwis.get_record(sites=site, service='iv', start=f'{str(start_date)[:7]}-01', end=f'{str(end_date)[:7]}-01') # change this with slider
-
-                    
-                    if '00060' in df.columns: # discharge
-                        disc_tmp[site]=df['00060']
-                    if '00065' in df.columns: # stage
-                        stage_tmp[site]=df['00065']
+            #     if '00060' in df.columns: # discharge
+            #         disc_tmp[site]=df['00060']
+            #     if '00065' in df.columns: # stage
+            #         stage_tmp[site]=df['00065']
 
 
 
-                if len(disc_tmp)>1:
-                    disc_tmp[disc_tmp < -999] = np.nan
-                    discharge_plot = px.line(disc_tmp,
-                                        x=disc_tmp.index,
-                                        y=disc_tmp.columns,
-                                        title='Discharge Observations',
-                                        labels={'y': 'Discharge (CFS)','x': 'Date Time'})
+            if len(disc_tmp)>1:
+                disc_tmp[disc_tmp < -999] = np.nan
+                discharge_plot = px.line(disc_tmp,
+                                    x=disc_tmp.index,
+                                    y=disc_tmp.columns,
+                                    title='Discharge Observations',
+                                    labels={'y': 'Discharge (CFS)','x': 'Date Time'})
 
-                    # Update the layout of the discharge plot to add ylabel
-                    discharge_plot.update_layout(
-                        yaxis_title='Discharge (CFS)'
-                    )
-                else:
-                        # If no observations, create an empty plot with a message
-                    discharge_plot = go.Figure()
-                    discharge_plot.add_annotation(
-                        text='No discharge observations available for the selected gage and time range.',
-                        showarrow=False,
-                        arrowhead=1,
-                        arrowcolor='black',
-                        arrowwidth=2,
-                        ax=0,
-                        ay=-40
-                    )
-
-
-                if len(stage_tmp)>1:
-                    stage_tmp[stage_tmp > 100] = np.nan
-                    stage_tmp[stage_tmp < -99] = np.nan
-                    stage_plot = px.line(stage_tmp,
-                                        x=stage_tmp.index,
-                                        y=stage_tmp.columns,
-                                        title='Stage Observations',
-                                        labels={'y': 'Stage (ft)','x': 'Date Time'})
-
-                    # Update the layout of the discharge plot to add ylabel
-                    stage_plot.update_layout(
-                        yaxis_title='Stage (ft)'
-                    )
-                else:
+                # Update the layout of the discharge plot to add ylabel
+                discharge_plot.update_layout(
+                    yaxis_title='Discharge (CFS)'
+                )
+            else:
                     # If no observations, create an empty plot with a message
-                    stage_plot = go.Figure()
-                    stage_plot.add_annotation(
-                        text='No stage observations available for the selected gage and time range.',
-                        showarrow=False,
-                        arrowhead=1,
-                        arrowcolor='black',
-                        arrowwidth=2,
-                        ax=0,
-                        ay=-40
-                    )
+                discharge_plot = go.Figure()
+                discharge_plot.add_annotation(
+                    text='No discharge observations available for the selected gage and time range.',
+                    showarrow=False,
+                    arrowhead=1,
+                    arrowcolor='black',
+                    arrowwidth=2,
+                    ax=0,
+                    ay=-40
+                )
 
-                met_tmp = pd.DataFrame()
+
+            if len(stage_tmp)>1:
+                stage_tmp[stage_tmp > 100] = np.nan
+                stage_tmp[stage_tmp < -99] = np.nan
+                stage_plot = px.line(stage_tmp,
+                                    x=stage_tmp.index,
+                                    y=stage_tmp.columns,
+                                    title='Stage Observations',
+                                    labels={'y': 'Stage (ft)','x': 'Date Time'})
+
+                # Update the layout of the discharge plot to add ylabel
+                stage_plot.update_layout(
+                    yaxis_title='Stage (ft)'
+                )
+            else:
+                # If no observations, create an empty plot with a message
+                stage_plot = go.Figure()
+                stage_plot.add_annotation(
+                    text='No stage observations available for the selected gage and time range.',
+                    showarrow=False,
+                    arrowhead=1,
+                    arrowcolor='black',
+                    arrowwidth=2,
+                    ax=0,
+                    ay=-40
+                )
+
+
+            # clipping the precip data
+            met_tmp = pd.DataFrame()
+
+            # selecting preloaded data for nearest gages
+            usgs_p = nearest_met_gages.STAID.tolist()
+            usgs_met = []
+
+            for ii in usgs_p:
+                if ii in met_df.columns:
+                    usgs_met.append(ii)
                 
-                for stn in tqdm.tqdm(nearest_met_gages.STAID):
-                    
-                    #stn='01652500'
-                    site = str(stn)
-                    # get instantaneous values (iv)
-                    df = nwis.get_record(sites=site, service='iv', start=f'{str(start_date)[:7]}-01', end=f'{str(end_date)[:7]}-01') # change this with slider
 
-                    
-                    if '00045' in df.columns: # discharge
-                        met_tmp[site]=df['00045']
+            met_tmp = met_df[usgs_met]
+            # applying time indexing
+            met_tmp = met_tmp[str(start_date):str(end_date)]
+            
+            # for stn in tqdm.tqdm(nearest_met_gages.STAID):
+                
+            #     #stn='01652500'
+            #     site = str(stn)
+            #     # get instantaneous values (iv)
+            #     df = nwis.get_record(sites=site, service='iv', start=f'{str(start_date)[:7]}-01', end=f'{str(end_date)[:7]}-01') # change this with slider
 
-                if len(met_tmp)>1:
-                    met_tmp[met_tmp > 100] = np.nan
-                    met_tmp[met_tmp < -99] = np.nan
+                
+            #     if '00045' in df.columns: # discharge
+            #         met_tmp[site]=df['00045']
 
-                    precip_plot = px.line(met_tmp,
-                                        x=met_tmp.index,
-                                        y=met_tmp.columns,
-                                        title='Precipitation Observations',
-                                        labels={'y': 'inches (in)','x': 'Date Time'})
+            if len(met_tmp)>1 and len(usgs_met)>0:
+                met_tmp[met_tmp > 100] = np.nan
+                met_tmp[met_tmp < -99] = np.nan
 
-                    # Update the layout of the discharge plot to add ylabel
-                    precip_plot.update_layout(
-                        yaxis_title='inches (in)'
-                    )
-                else:
-                    # If no observations, create an empty plot with a message
-                    precip_plot = go.Figure()
-                    precip_plot.add_annotation(
-                        text='No precipitation observations available for the selected gage and time range.',
-                        showarrow=False,
-                        arrowhead=1,
-                        arrowcolor='black',
-                        arrowwidth=2,
-                        ax=0,
-                        ay=-40
-                    )
+                precip_plot = px.line(met_tmp,
+                                    x=met_tmp.index,
+                                    y=met_tmp.columns,
+                                    title='Precipitation Observations',
+                                    labels={'y': 'inches (in)','x': 'Date Time'})
+
+                # Update the layout of the discharge plot to add ylabel
+                precip_plot.update_layout(
+                    yaxis_title='inches (in)'
+                )
+            else:
+
+                # If no observations, create an empty plot with a message
+                precip_plot = go.Figure()
+                precip_plot.add_annotation(
+                    text='No precipitation observations available for the selected gage and time range.',
+                    showarrow=False,
+                    arrowhead=1,
+                    arrowcolor='black',
+                    arrowwidth=2,
+                    ax=0,
+                    ay=-40
+                )
 
 
 
