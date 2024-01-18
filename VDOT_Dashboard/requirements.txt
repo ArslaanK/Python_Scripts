@@ -177,7 +177,7 @@ pluggy @ file:///home/conda/feedstock_root/build_artifacts/pluggy_1667232663820/
 ply==3.11
 prometheus-client @ file:///home/conda/feedstock_root/build_artifacts/prometheus_client_1674535637125/work
 prompt-toolkit @ file:///home/conda/feedstock_root/build_artifacts/prompt-toolkit_1670414775770/work
-protobuf==3.12.4
+protobuf==3.18.3
 psutil @ file:///D:/bld/psutil_1667886042967/work
 pure-eval @ file:///home/conda/feedstock_root/build_artifacts/pure_eval_1642875951954/work
 py-noaa==1.0
