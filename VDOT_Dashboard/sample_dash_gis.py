@@ -106,8 +106,8 @@ file_names = { 'VDOT closures': 'road_closures.csv',
 # loading observations
 
 
-disc_df = pd.read_csv(f"{data_root}/{file_names['Obs Stage']}")       
-stage_df = pd.read_csv(f"{data_root}/{file_names['Obs Discharge']}")          
+disc_df = pd.read_csv(f"{data_root}/{file_names['Obs Discharge']}")       
+stage_df = pd.read_csv(f"{data_root}/{file_names['Obs Stage']}")          
 met_df = pd.read_csv(f"{data_root}/{file_names['Obs Precipitation']}") 
 
 # converting to datetime index
