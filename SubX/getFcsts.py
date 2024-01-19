@@ -23,6 +23,79 @@ from subx_utils import *
 import warnings
 warnings.filterwarnings("ignore")
 
+# adding functions
+
+
+def initSubxModels():
+    
+    #all_varnames=['ua','ua','rlut','tas','ts','zg','va','va','pr','zg','uas','vas','psl']
+    #all_plevstrs=['850','200','toa','2m','sfc','500','200','850','sfc','200','10m','10m','msl']
+    #all_units=['ms-1','ms-1','Wm-2','degC','degC','m','ms-1','ms-1','mmday-1','m','ms-1','ms-1','hPa']
+    
+    all_varnames=['tas','pr','zg']
+    all_plevstrs=['2m','sfc','500']
+    all_units=['degC','mmday-1','m']
+   
+    sub1_varnames=['tas','pr','zg']
+    sub1_plevstrs=['2m','sfc','500']
+    sub1_units=['degC','mmday-1','m']
+
+    all_varnames=['uas','vas','psl']
+    all_plevstrs=['10m','10m','msl']
+    all_units=['ms-1','ms-1','hPa']
+   
+    sub1_varnames=['uas','vas','psl']
+    sub1_plevstrs=['10m','10m','msl']
+    sub1_units=['ms-1','ms-1','hPa']
+
+
+
+
+    
+    ccsm4_dict={'model':'CCSM4','group':'RSMAS','varnames': all_varnames, 'plevstrs': all_plevstrs, 'plot_loc':2}
+    geos_dict={'model':'GEOS_V2p1','group':'GMAO','varnames': all_varnames, 'plevstrs': all_plevstrs,'plot_loc':4}
+    fim_dict={'model':'FIMr1p1','group':'ESRL','varnames': all_varnames, 'plevstrs': all_plevstrs,'plot_loc':1}
+    #geps_dict={'model':'GEPS6','group':'ECCC','varnames': all_varnames, 'plevstrs': all_plevstrs,'plot_loc':6}
+    geps_dict={'model':'GEPS7','group':'ECCC','varnames': all_varnames, 'plevstrs': all_plevstrs,'plot_loc':6}
+    nrl_dict={'model':'NESM','group':'NRL','varnames': all_varnames, 'plevstrs': all_plevstrs,'plot_loc':5}
+    gefs_dict={'model':'GEFSv12_CPC','group':'EMC','varnames': sub1_varnames, 'plevstrs': sub1_plevstrs,'plot_loc':3}
+    #gefs_dict={'model':'GEFSv12','group':'EMC','varnames': sub1_varnames, 'plevstrs': sub1_plevstrs,'plot_loc':3}
+    cfsv2_dict={'model':'CFSv2','group':'NCEP','varnames': sub1_varnames, 'plevstrs': sub1_plevstrs,'plot_loc':7}
+
+    subxclimos_list=[fim_dict,ccsm4_dict,geos_dict,nrl_dict,geps_dict,gefs_dict,cfsv2_dict]
+    subxmodels_list=[fim_dict,ccsm4_dict,geos_dict,nrl_dict,geps_dict,gefs_dict,cfsv2_dict]
+   
+    return subxmodels_list, subxclimos_list,all_varnames, all_plevstrs, all_units
+
+
+def getFcstDates(date=None):
+
+    if (date):
+        print("Using Input Date: ",date)
+        currentdate=datetime.strptime(date,'%Y%m%d')
+        print("Using Input Date: ",currentdate)
+    else:
+        currentdate=datetime.today().replace(microsecond=0,second=0,minute=0,hour=0)
+        print("Using Current Date: ",currentdate)
+
+    # How far are we from the most recent thurs?
+    diffdate=(currentdate.weekday()-3) % 7
+
+    # fcstdate is the most recent Thurs
+    fcstdate=currentdate-timedelta(days=diffdate)
+
+    # Identify the previous Friday (6 days earlier) as start of fcst week
+    weekdate=fcstdate - timedelta(days=6)
+
+    print("USING FCSTS ICS FROM: ",weekdate.strftime(('%Y%m%d')), " to ",fcstdate.strftime('%Y%m%d'))
+    print("Output files and figures will be labeled as: ",fcstdate.strftime('%Y%m%d'))
+
+    # Get the range of dates over the last week from the start of previous fcst week to fcstdate
+    fcst_week_dates=pd.date_range(start=weekdate,end=fcstdate,freq='D') 
+    
+    return fcstdate,fcst_week_dates
+
+
 # Set xarray to keep attributes
 xr.set_options(keep_attrs=True)
 
@@ -62,10 +135,7 @@ else:
 timeout_seconds = 60
 url='http://iridl.ldeo.columbia.edu/SOURCES/.Models/.SubX/'
 datatype='forecast'
-#hcstPath='/shared/subx/hindcast/'
-hcstPath='/mcs/scratch/kpegion/subx/hindcast/'
 hcstPath='/home/admin/Work/Operational/SubX/Pre-Process/Operational2023_subx/'
-#outPath='/mcs/scratch/kpegion/subx/figs_test/'
 outPath='/home/admin/Work/Operational/SubX/Pre-Process/Operational2023_subx/'
 
 #print(subxclimos_list)
